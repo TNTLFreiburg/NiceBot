@@ -1,0 +1,7 @@
+std_msgs/Header  header
+std_msgs/Float64MultiArray rawSignal
+std_msgs/Float64MultiArray joystickData
+std_msgs/Float64MultiArray prediction
+std_msgs/Float64MultiArray groundTruth
+std_msgs/String electrodeLabels
+std_msgs/String stimulusState

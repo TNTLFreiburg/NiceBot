@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Export-Package: eeg_msg;version="1.0";uses:="org.ros.internal.message,
+ std_msgs"
+Bundle-Version: 1.0
+Tool: Bnd-2.1.0.20130426-122213
+Bundle-Name: eeg_msg
+Bnd-LastModified: 1464870750654
+Created-By: 1.7.0_60 (Oracle Corporation)
+Bundle-ManifestVersion: 2
+Bundle-SymbolicName: org.ros.rosjava_messages.eeg_msg
+Import-Package: org.ros.internal.message,std_msgs;version="[0.5,1)"
+

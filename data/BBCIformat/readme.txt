@@ -1,0 +1,1 @@
+Please note that the EEG data in the BBCI files is re-referenced to a common average reference (CAR).
