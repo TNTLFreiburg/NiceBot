@@ -1,9 +1,9 @@
 # NiceBot
 
 This Repository contains data and and code (matlab / python) for the analysis of the manuscript:
-"Be Nice, Bot! Evaluation of Robot Behavior in BCI"
+"Human-Compliant Robot Behavior: Combining Continuous Subjective Evaluation with Multimodal Deep Regression Analysis"
 by
-Martin Völker, Lukas D.J. Fiederer, Robin T. Schirrmeister, Joschka Boedecker, Wolfram Burgard, and Tonio Ball
+Martin Völker, Lukas D.J. Fiederer, Robin T. Schirrmeister, Wolfram Burgard, Joschka Boedecker, and Tonio Ball
 
 link:
 
