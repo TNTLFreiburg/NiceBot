@@ -650,12 +650,12 @@ N_perturbations = 20
 
 
 # which network
-Deep4 = False
-ResNet = True
+Deep4 = True
+ResNet = False
 EEGNet_v4 = False
 
 #storage
-dir_outputData = '/outputData'
+dir_outputData = './outputData'
 
 
 for Settings in [4]:
@@ -713,7 +713,7 @@ for Settings in [4]:
     elif RobotAux:
         saveAddonText_tmp = saveAddonText_orig  + '_RobotAux'
 
-    for adam in [False]:
+    for adam in [True, False]:
 
         if adam:
             saveAddonText = saveAddonText_tmp + '_adam'
@@ -742,7 +742,7 @@ for Settings in [4]:
 
 
 
-            train_filename = '/BBCI_files/' + subjName +  '_' + str(samplingRate) + 'Hz_CAR.BBCI.mat'
+            train_filename = './data/BBCIformat/' + subjName +  '_' + str(samplingRate) + 'Hz_CAR.BBCI.mat'
 
 
             sensor_names = BBCIDataset.get_all_sensors(train_filename, pattern=None)
@@ -768,7 +768,7 @@ for Settings in [4]:
 
             
             #load score
-            score_filename = '/media/eeg-raid/Martin/Nicebot/BBCI_files/' + subjName + '_score.mat'
+            score_filename = './data/BBCIformat/' + subjName + '_score.mat'
             Score_tmp = scipy.io.loadmat(score_filename)
             Score = Score_tmp['score_resample']
 

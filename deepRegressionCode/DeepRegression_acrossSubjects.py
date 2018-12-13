@@ -633,7 +633,6 @@ nSecondsTestSet = 180
 
 
 saveAddonText_orig = '_3minTest'
-#saveAddonText_orig = '_wholeSessionTest'
 batch_size = 64
 pool_time_stride = 3
 
@@ -653,7 +652,7 @@ ResNet = False
 EEGNet_v4 = False
 
 #storage
-dir_outputData = '/outputFolder'
+dir_outputData = './outputData'
 
 # optimizer
 adam = True
@@ -712,7 +711,7 @@ for iSubject, subjName in enumerate(Subjects):
 
 
 
-    train_filename = '/BBCI_files/' + subjName +  '_' + str(samplingRate) + 'Hz_CAR.BBCI.mat'
+    train_filename = './data/BBCIformat/' + subjName +  '_' + str(samplingRate) + 'Hz_CAR.BBCI.mat'
 
 
     sensor_names = BBCIDataset.get_all_sensors(train_filename, pattern=None)
@@ -738,7 +737,7 @@ for iSubject, subjName in enumerate(Subjects):
 
     
     #load score
-    score_filename = '/media/eeg-raid/Martin/Nicebot/BBCI_files/' + subjName + '_score.mat'
+    score_filename = './data/BBCIformat/' + subjName + '_score.mat'
     Score_tmp = scipy.io.loadmat(score_filename)
     Score = Score_tmp['score_resample']
 

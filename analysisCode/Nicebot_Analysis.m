@@ -1,4 +1,5 @@
 %% Main script for the analysis of the experiments for the "Be Nice, Bot" paper.
+%
 % dependencies: 
 %   Modi1987/KST-Kuka-Sunrise-Toolbox
 %       (https://github.com/Modi1987/KST-Kuka-Sunrise-Toolbox)
@@ -13,10 +14,11 @@
 % First, load data file of respective subject, e.g.:
 load('allFiles_moderateExp.mat');
 
+%then, run the respective sections within the script individually
 %% add path to kuka sunrise toolbox
 
-addpath('\Modi1987-KST-Kuka-Sunrise-Toolbox-7b72637\realTimeControl_iiwa_From_Vrep');
-%% Simulation in V-Rep
+addpath('.\Modi1987-KST-Kuka-Sunrise-Toolbox-7b72637\realTimeControl_iiwa_From_Vrep');
+%% Simulation in V-Rep (V-REP scene has to be opened and expecting a connection)
 
 % get score
 x = JoystickData(:,4);
@@ -66,13 +68,24 @@ else
     error('The connection to V-Rep seems to have failed.');
 end
 
-%
-hf = figure;
+
+% live colormap plot of rating
+
+% figure tight formatting
+iptsetpref('ImshowBorder','tight');
+%removes menu and toolbar from all new figures
+set(0,'DefaultFigureMenu','none');
+%makes disp() calls show things without empty lines
+format compact
+
+% hf = figure('MenuBar', 'None', 'color', [1 1 1], 'Name', 'Live Rating', 'Numbertitle', 'off');
 hold on;
 set(gca, 'clim', [-1,1])
-colorbar;
+hcb = colorbar;
 cMap = colormap(brewermap(512,'RdBu'));
 colormap(cMap);
+ylabel(hcb, 'subjective rating');
+set(gca, 'box','off','XTickLabel',[],'XTick',[],'YTickLabel',[],'YTick',[])
 
 vrep.simxStartSimulation(clientID,vrep.simx_opmode_oneshot_wait);
 for i=1:7
@@ -92,17 +105,21 @@ for iTime = 1:nJointStateData
         vrep.simxSetJointPosition(clientID,jHandles(i), JointStateData_Position(iTime,i), vrep.simx_opmode_streaming);
     end
     
-    pause(0.001);
-%     get hand base position relative to head
+     pause(0.001); %comment if a live rating plot is not desired (slows sim down)
+     
+    %get hand base position relative to head
     [~, handBasePosition(iTime,:)] =  vrep.simxGetObjectPosition(clientID, gripHandle, headHandle, vrep.simx_opmode_oneshot_wait);
     
-    imagesc(score(iTime));
+     imagesc(score(iTime)); %comment if a live rating plot is not desired (slows sim down)
 
 end
 
 
 vrep.simxStopSimulation(clientID,vrep.simx_opmode_oneshot_wait);
 
+
+%figure settings back to default
+set(0,'Default');
 %%
 
 effectorDistance = sqrt(handBasePosition(:,1).^2 + handBasePosition(:,2).^2 + handBasePosition(:,3).^2);
@@ -351,21 +368,12 @@ print(gcf,'score_development_no_exp','-dpng','-r300');
 
 %% convert to BBCI format
 Settings.convertForConvNet = 1;
-H.PatientSession = 'JeNB1';
+H.PatientSession = 'modExp'; %noExp, substExp
+
 if Settings.convertForConvNet
-    %         disp('------------- Downsampling ------------');
-    %         addpath('\\172.30.0.119\archive\matlab_toolboxes\BBCI_import');
-    if H.sf ~= 256
-        nSamples = size(EEGData,1)-1;
-%         M.xtick=[0,nSamples/2, nSamples/2+1, nSamples];M.xtickl={'1', '2', '1', '2'};
-        M.xtick=[0, nSamples-1];M.xtickl={'1','2'};
-        ds_rate = H.sf / 256;
-        D.data = EEGData;
-        H.source = 'DryEEG';
-        [H, M, D] = ERN_downsampleEEGtv(H, M, D, ds_rate);
-    end
     
     nChannels = numel(H.cn);
+    
     % also save hand position
     handBasePosition_x_resample =   resample(score, size(D.data,2), size(handBasePosition(:,1),1))';
     handBasePosition_y_resample =   resample(score, size(D.data,2), size(handBasePosition(:,2),1))';
