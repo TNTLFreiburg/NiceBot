@@ -8,7 +8,11 @@
 %   brewermap
 %       (https://de.mathworks.com/matlabcentral/fileexchange/45208-colorbrewer-attractive-and-distinctive-colormaps)
 %
+<<<<<<< Updated upstream
 % 2018, Martin Völker
+=======
+% 2018, Martin V�lker
+>>>>>>> Stashed changes
 
 %% Instructions
 % First, load data file of respective subject, e.g.:
@@ -191,8 +195,8 @@ plot(effector_velocity, score(2:end),'.')
 figure('color', 'white', 'units', 'normalized', 'Position', [0.1, 0.1, 0.5, 0.5]);
 set(gca, 'clim', [-1,1])
 hc = colorbar;
-% cMap = colormap(brewermap(512,'RdBu'));
-cMap = colormap(brewermap(512,'RDYlBu'));
+cMap = colormap(brewermap(512,'RdBu'));
+% cMap = colormap(brewermap(512,'RDYlBu'));
 colormap(cMap);
 
 hold on;
@@ -276,6 +280,7 @@ view(az,el);
 
 
 % +- 0.2
+clear pos
 pos{1} = [1.032, -0.48, 0.689]; %_init
 pos{2} = [1.429, -0.655, -0.307]; %_grasping
 pos{3} = [0.099, -0.70, 0.509]; %_overhead
@@ -298,8 +303,8 @@ for iPos = 1:numel(pos)
     score_pos{iPos}(handBasePosition(:,3) < (pos{iPos}(3)-distance)) =  nan;
     score_pos{iPos}(handBasePosition(:,3) > (pos{iPos}(3)+distance)) =  nan;
     
-    JointStateData_Position_copy{iPos} = JointStateData_Position;
-    JointStateData_Position_copy{iPos}(isnan(score_pos{iPos}),:) = [];
+%     JointStateData_Position_copy{iPos} = JointStateData_Position;
+%     JointStateData_Position_copy{iPos}(isnan(score_pos{iPos}),:) = [];
     score_pos{iPos}(isnan(score_pos{iPos})) = [];
     
     
