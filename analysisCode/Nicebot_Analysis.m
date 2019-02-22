@@ -8,7 +8,7 @@
 %   brewermap
 %       (https://de.mathworks.com/matlabcentral/fileexchange/45208-colorbrewer-attractive-and-distinctive-colormaps)
 %
-% 2018, Martin Völker
+% 2018, Martin VÃ¶lker
 
 %% Instructions
 % First, load data file of respective subject, e.g.:
@@ -369,15 +369,16 @@ print(gcf,'score_development_no_exp','-dpng','-r300');
 %% convert to BBCI format
 Settings.convertForConvNet = 1;
 H.PatientSession = 'modExp'; %noExp, substExp
+D.data = EEGData';
 
 if Settings.convertForConvNet
     
     nChannels = numel(H.cn);
     
     % also save hand position
-    handBasePosition_x_resample =   resample(score, size(D.data,2), size(handBasePosition(:,1),1))';
-    handBasePosition_y_resample =   resample(score, size(D.data,2), size(handBasePosition(:,2),1))';
-    handBasePosition_z_resample =   resample(score, size(D.data,2), size(handBasePosition(:,3),1))';
+    handBasePosition_x_resample =   resample(handBasePosition(:,1), size(D.data,2), size(handBasePosition(:,1),1))';
+    handBasePosition_y_resample =   resample(handBasePosition(:,2), size(D.data,2), size(handBasePosition(:,2),1))';
+    handBasePosition_z_resample =   resample(handBasePosition(:,3), size(D.data,2), size(handBasePosition(:,3),1))';
     H.cn{nChannels+1} = 'robotHandPos_x';
     D.data(nChannels+1,:) = handBasePosition_x_resample;
     H.cn{nChannels+2} = 'robotHandPos_y';
