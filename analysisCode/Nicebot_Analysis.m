@@ -8,11 +8,7 @@
 %   brewermap
 %       (https://de.mathworks.com/matlabcentral/fileexchange/45208-colorbrewer-attractive-and-distinctive-colormaps)
 %
-<<<<<<< Updated upstream
 % 2018, Martin Völker
-=======
-% 2018, Martin V�lker
->>>>>>> Stashed changes
 
 %% Instructions
 % First, load data file of respective subject, e.g.:
