@@ -1,7 +1,4 @@
 
-get_ipython().magic(u'load_ext autoreload')
-get_ipython().magic(u'autoreload 2')
-
 import logging
 import sys
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
@@ -17,7 +14,8 @@ import mne
 from collections import OrderedDict
 
 import os
-os.sys.path.append('/home/martin/braindecode/code/adamw-eeg-eval/')
+os.sys.path.append('/home/lukas/adamw-eeg-eval/')
+#from braindecode.torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
 from adamweegeval.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
 from adamweegeval.optimizers import AdamW 
 
@@ -65,6 +63,12 @@ from copy import deepcopy
 
 import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
+
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import LinearSVR, SVR
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+
 
 
 ############################################## class definitions ##########################################################
@@ -621,6 +625,7 @@ def perturbation_correlation(pert_fn, diff_fn, pred_fn, n_layers, inputs, n_iter
 # Set if you want to use GPU
     # You can also use torch.cuda.is_available() to determine if cuda is available on your machine.
 cuda = True
+gpu_index = 0
 
 
 Subjects =['noExp', 'moderateExp', 'substantialExp'];
@@ -632,8 +637,7 @@ Subjects =['noExp', 'moderateExp', 'substantialExp'];
 #adamw = False
 
 nSecondsTestSet = 180
-
-
+nSecondsValidationSet = 180
 
 saveAddonText_orig = '_3minTest'
 batch_size = 64
@@ -644,21 +648,31 @@ samplingRate = 256
 maxTrainEpochs = 200
 
 
-#viz
+# viz
 calcViz = False
 N_perturbations = 20
 
 
-# which network
-Deep4 = True
+# which model
+Deep4 = False
 ResNet = False
-EEGNet_v4 = False
+EEGNet_v4 = True
+lin_reg = False
+lin_svr = False
+rbf_svr = False
+rf_reg = False
+
+# which EEG frequency band
+band_pass = [[0, 4], [4, 8], [8, 14], [14, 20], [20, 30], [30, 40]]
+
+# which EEG electrodes
+electrodes = ['*z']  # Midline
 
 #storage
-dir_outputData = './outputData'
+dir_outputData = './outputData_with_validation_keep_best_corr'
 
 
-for Settings in [4]:
+for Settings in [0]:
 
     if Settings == 0:
         onlyRobotData = True
@@ -810,19 +824,63 @@ for Settings in [4]:
             # split data and test set
             #first_set_fraction = 0.95
             #cutInd = int(np.size(train_set.y)*first_set_fraction)
-            cutInd = int( np.size(train_set.y) - nSecondsTestSet*samplingRate ) # use last nSecondsTestSet as test set
-
+            cutInd_test = int( np.size(train_set.y) - nSecondsTestSet*samplingRate ) # use last nSecondsTestSet as test set
             test_set = deepcopy(train_set)
-            test_set.X[0] = np.array(np.float32(test_set.X[0][:, cutInd:]))
-            test_set.y = np.float32(test_set.y[:, cutInd:])
+            test_set.X[0] = np.array(np.float32(test_set.X[0][:, cutInd_test:]))
+            test_set.y = np.float32(test_set.y[:, cutInd_test:])
+            
+            cutInd_valid = int( np.size(train_set.y) - (nSecondsValidationSet+nSecondsTestSet)*samplingRate ) # use last nSecondsTestSet as test set
+            valid_set = deepcopy(train_set)
+            valid_set.X[0] = np.array(np.float32(valid_set.X[0][:, cutInd_valid:cutInd_test]))
+            valid_set.y = np.float32(valid_set.y[:, cutInd_valid:cutInd_test])
 
-            train_set.X[0] = np.array(np.float32(train_set.X[0][:, :cutInd]))
-            train_set.y = np.float32(train_set.y[:, :cutInd])
+            train_set.X[0] = np.array(np.float32(train_set.X[0][:, :cutInd_valid]))
+            train_set.y = np.float32(train_set.y[:, :cutInd_valid])
 
-            valid_set = None
+            # insert traditional ML here
+            # regr = LinearRegression(fit_intercept=True, normalize=False, copy_X=True, n_jobs=None)
+            # regr = LinearSVR(verbose=3, random_state=20170629, max_iter=30)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
+            # regr = NuSVR(verbose=3, max_iter=1)  # nu=0.5, C=1.0, kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, shrinking=True, tol=0.001, cache_size=200, verbose=False, max_iter=-1)
+            # regr = SVR(verbose=3, max_iter=182)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
+            regr = RandomForestRegressor(n_estimators=100, n_jobs=10, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
+
+            # Train the model using the training sets
+            regr.fit(train_set.X[0].T, train_set.y.T.squeeze())
+
+            # Make predictions using the validation set
+            valid_set_pred = regr.predict(valid_set.X[0].T)
+
+            # The coefficients
+            # print('Coefficients: \n', regr.coef_)
+            # The mean squared error
+            print("Mean squared error: %.2f"
+                  % mean_squared_error(valid_set.y.T, valid_set_pred))
+            # Explained variance score: 1 is perfect prediction
+            print('Variance score: %.2f' % r2_score(valid_set.y.T, valid_set_pred))
+
+            (corrcoefs, pval) = pearsonr(valid_set_pred, valid_set.y.T[:, 0])
+            print([corrcoefs, pval])
+
+            # Plot outputs
+            plt.rcParams.update({'font.size': 24})
+            plt.figure(figsize=(32, 12))
+            t = np.arange(valid_set_pred.shape[0])/samplingRate
+            plt.plot(t, valid_set_pred)
+            plt.plot(t, valid_set.y.T)
+            plt.legend(('Predicted', 'Actual'), fontsize=24)
+            plt.title('r = {:f}, p = {:f}'.format(corrcoefs, pval))
+            plt.xlabel('time (s)')
+            plt.ylabel('subjective rating')
+            plt.ylim(-1, 1)
+            plt.xlim(0,  int(np.round(valid_set_pred.shape[0]/samplingRate)))
+            plt.show()
+
+
+            # ADD  DISTANCE AND SPEED TO BBCI FILE!!!
 
 
             set_random_seeds(seed=20170629, cuda=cuda)
+            torch.cuda.set_device(gpu_index)
 
             # This will determine how many crops are processed in parallel
             input_time_length = int(timeWindowDuration/1000*samplingRate) # train_set.X.shape[1]
@@ -962,7 +1020,7 @@ for Settings in [4]:
             exp = Experiment(model, train_set, valid_set, test_set, iterator,
                              loss_function, optimizer, model_constraint,
                              monitors, stop_criterion,
-                             remember_best_column='train_loss', do_early_stop = False,
+                             remember_best_column='valid_corr', do_early_stop = False,
                              run_after_early_stop=False, batch_modifier=None, cuda=cuda)        
             exp.run()
 
