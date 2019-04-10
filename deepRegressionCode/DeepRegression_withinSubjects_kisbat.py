@@ -909,7 +909,7 @@ def run_experiment(
                 elif rbf_svr:
                     regr = SVR(verbose=3)#, max_iter=1000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
                 elif rf_reg:
-                    regr = RandomForestRegressor(n_estimators=1000, n_jobs=10, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
+                    regr = RandomForestRegressor(n_estimators=100, n_jobs=10, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
 
                 # Train the model using the training sets
                 print('Training traditional regression model...')
