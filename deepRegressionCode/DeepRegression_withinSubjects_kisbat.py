@@ -21,6 +21,7 @@ import fnmatch
 import shortuuid
 import glob
 import pandas as pd
+import joblib # to save models
 #from braindecode.torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
 os.sys.path.append('/home/fiederer/adamw-eeg-eval/')
 from adamweegeval.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
@@ -915,13 +916,13 @@ def run_experiment(
                 regr.fit(train_set.X[0].T, train_set.y.T.squeeze())
 
                 # Save model
-                np.save(model_base_name + '_model.npy', regr)
+                joblib.dump(regr, model_base_name + '_model.pkl.z')  # z to compress using zlib
 
                 # Make predictions using the training set
                 print('Testing on train data...')
                 train_set_pred = regr.predict(train_set.X[0].T)
                 print('Saving training set predictions...')
-                np.savez(model_base_name + '_train_preds.npz', train_set.X[0].T, train_set_pred)
+                joblib.dump([train_set.X[0].T, train_set_pred], model_base_name + '_train_preds.plk.z')
 
                 # Metrics
                 mse_train = mean_squared_error(train_set.y.T, train_set_pred)
@@ -937,7 +938,7 @@ def run_experiment(
                     print('Testing on validation data...')
                     valid_set_pred = regr.predict(valid_set.X[0].T)
                     print('Saving validation set predictions...')
-                    np.savez(model_base_name + '_valid_preds.npz', valid_set.X[0].T, valid_set_pred)
+                    joblib.dump([valid_set.X[0].T, valid_set_pred], model_base_name + '_valid_preds.pkl.z')
 
                     # Metrics
                     mse_valid = mean_squared_error(valid_set.y.T, valid_set_pred)
@@ -958,7 +959,7 @@ def run_experiment(
                 print('Testing on test data...')
                 test_set_pred = regr.predict(test_set.X[0].T)
                 print('Saving test set predictions...')
-                np.savez(model_base_name + '_test_preds.npz', test_set.X[0].T, test_set_pred)
+                joblib.dump([test_set.X[0].T, test_set_pred], model_base_name + '_test_preds.pkl.z')
 
                 # Metrics
                 mse_test = mean_squared_error(test_set.y.T, test_set_pred)
@@ -1220,7 +1221,7 @@ def run_experiment(
                 (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                 mse = mean_squared_error(targets_per_trial, preds_per_trial)
                 print('Saving training set predictions...')
-                np.savez(exp.model_base_name + '_train_preds.npz', targets_per_trial, preds_per_trial)
+                joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_train_preds.pkl.z')
 
                 # %% plot predicted rating
                 plt.rcParams.update({'font.size': 24})
@@ -1257,7 +1258,7 @@ def run_experiment(
                     (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                     mse = mean_squared_error(targets_per_trial, preds_per_trial)
                     print('Saving validation set predictions...')
-                    np.savez(exp.model_base_name + '_valid_preds.npz', targets_per_trial, preds_per_trial)
+                    joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_valid_preds.pkl.z')
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
@@ -1294,7 +1295,7 @@ def run_experiment(
                     (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                     mse = mean_squared_error(targets_per_trial, preds_per_trial)
                     print('Saving test set predictions...')
-                    np.savez(exp.model_base_name + '_test_preds.npz', targets_per_trial, preds_per_trial)
+                    joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_test_preds.pkl.z')
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
