@@ -624,6 +624,14 @@ def perturbation_correlation(pert_fn, diff_fn, pred_fn, n_layers, inputs, n_iter
     pert_corrs = [pert_corrs[l]/n_iterations for l in range(n_layers)] #mean over iterations
     return pert_corrs
 
+def save_params(exp):
+    filename = exp.model_base_name + '.model_params.pkl'
+    log.info("Save model params to {:s}".format(filename))
+    th.save(exp.model.state_dict(), filename)
+    filename = exp.model_base_name + '.trainer_params.pkl'
+    log.info("Save trainer params to {:s}".format(filename))
+    th.save(exp.optimizer.state_dict(), filename)
+
 ########################################################################################################
 
 
@@ -790,7 +798,8 @@ def run_experiment(
         for subjName in subjects:
 
             # Check if experiment has already been run. If so go to next subject
-            result_files = glob.glob(dir_output_data + '/' + subjName + save_addon_text + '.csv')
+            model_base_name = dir_output_data + '/' + subjName + save_addon_text
+            result_files = glob.glob(model_base_name + '.csv')
             if result_files:
                 print(subjName + save_addon_text + ' has already been run. Trying next subject.')
                 continue
@@ -861,7 +870,7 @@ def run_experiment(
 
             train_set.y = score[:,:-1]
             # split data and test set
-            cut_ind_test = int( np.size(train_set.y) - n_seconds_test_set*sampling_rate ) # use last nSecondsTestSet as test set
+            cut_ind_test = int(np.size(train_set.y) - n_seconds_test_set*sampling_rate) # use last nSecondsTestSet as test set
             test_set = deepcopy(train_set)
             test_set.X[0] = np.array(np.float32(test_set.X[0][:, cut_ind_test:]))
             test_set.y = np.float32(test_set.y[:,cut_ind_test:])
@@ -881,8 +890,6 @@ def run_experiment(
 
             train_set.X[0] = np.array(np.float32(train_set.X[0][:, :cut_ind_valid]))
             train_set.y = np.float32(train_set.y[:,:cut_ind_valid])
-            #train_set.X[0] = np.array(np.float32(train_set.X[0][:, :cut_ind_test]))
-            #train_set.y = np.float32(train_set.y[:,:cut_ind_test])
 
             # Normalize targets
             # train_set_y_mean = np.mean(train_set.y)
@@ -897,9 +904,9 @@ def run_experiment(
                 if lin_reg:
                     regr = LinearRegression(fit_intercept=True, normalize=False, copy_X=True, n_jobs=None)
                 elif lin_svr:
-                    regr = LinearSVR(verbose=3, random_state=20170629, max_iter=1000)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
+                    regr = LinearSVR(verbose=3, random_state=20170629)#, max_iter=1000)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
                 elif rbf_svr:
-                    regr = SVR(verbose=3, max_iter=1000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
+                    regr = SVR(verbose=3)#, max_iter=1000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
                 elif rf_reg:
                     regr = RandomForestRegressor(n_estimators=1000, n_jobs=10, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
 
@@ -907,9 +914,14 @@ def run_experiment(
                 print('Training traditional regression model...')
                 regr.fit(train_set.X[0].T, train_set.y.T.squeeze())
 
+                # Save model
+                np.save(model_base_name + '_model.npy', regr)
+
                 # Make predictions using the training set
                 print('Testing on train data...')
                 train_set_pred = regr.predict(train_set.X[0].T)
+                print('Saving training set predictions...')
+                np.savez(model_base_name + '_train_preds.npz', train_set.X[0].T, train_set_pred)
 
                 # Metrics
                 mse_train = mean_squared_error(train_set.y.T, train_set_pred)
@@ -924,6 +936,8 @@ def run_experiment(
                 if n_seconds_valid_set > 0:
                     print('Testing on validation data...')
                     valid_set_pred = regr.predict(valid_set.X[0].T)
+                    print('Saving validation set predictions...')
+                    np.savez(model_base_name + '_valid_preds.npz', valid_set.X[0].T, valid_set_pred)
 
                     # Metrics
                     mse_valid = mean_squared_error(valid_set.y.T, valid_set_pred)
@@ -943,6 +957,8 @@ def run_experiment(
                 # Make predictions using the test set
                 print('Testing on test data...')
                 test_set_pred = regr.predict(test_set.X[0].T)
+                print('Saving test set predictions...')
+                np.savez(model_base_name + '_test_preds.npz', test_set.X[0].T, test_set_pred)
 
                 # Metrics
                 mse_test = mean_squared_error(test_set.y.T, test_set_pred)
@@ -963,7 +979,7 @@ def run_experiment(
                                           'Test mse': mse_test, 'Test corr': corrcoef_test, 'Test corr p':
                                           pval_test, 'Test explained variance': var_score_test,
                                           }).to_frame(subjName + save_addon_text)
-                result_df.to_csv(dir_output_data + '/' + subjName + save_addon_text + '.csv', sep=',', header=True)
+                result_df.to_csv(model_base_name + '.csv', sep=',', header=True)
                 # Explained variance score: 1 is perfect prediction
 
                 # Plot outputs
@@ -982,7 +998,7 @@ def run_experiment(
                 plt.ylim(-1, 1)
                 plt.xlim(0, int(np.round(train_set_pred.shape[0] / sampling_rate)))
                 # plt.show()
-                plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_pred_train.png',
+                plt.savefig(model_base_name + '_fig_pred_train.png',
                             bbox_inches='tight', dpi=300)
 
                 if n_seconds_valid_set > 0:
@@ -1001,7 +1017,7 @@ def run_experiment(
                     plt.ylim(-1, 1)
                     plt.xlim(0,  int(np.round(valid_set_pred.shape[0]/sampling_rate)))
                     # plt.show()
-                    plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_pred_valid.png',
+                    plt.savefig(model_base_name + '_fig_pred_valid.png',
                                 bbox_inches='tight', dpi=300)
 
                 if n_seconds_test_set > 0:
@@ -1021,7 +1037,7 @@ def run_experiment(
                     plt.ylim(-1, 1)
                     plt.xlim(0, int(np.round(test_set_pred.shape[0] / sampling_rate)))
                     # plt.show()
-                    plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_pred_test.png',
+                    plt.savefig(model_base_name + '_fig_pred_test.png',
                                 bbox_inches='tight', dpi=300)
                 # ADD  DISTANCE AND SPEED TO BBCI FILE!!!
 
@@ -1166,11 +1182,16 @@ def run_experiment(
                 exp.run()
 
                 # %% save values: CC, pred, resp
+                exp.model_base_name = model_base_name
                 if (len(exp.epochs_df) != max_train_epochs+1):
                     print('WARNING: the epoch dataframe has too few epochs: {:d}'.format(len(exp.epochs_df)))
 
                 print('Saving epoch dataframe...')
-                exp.epochs_df.to_csv(dir_output_data + '/' + subjName + save_addon_text + '.csv', sep=',', header=True)
+                exp.epochs_df.to_csv(exp.model_base_name + '.csv', sep=',', header=True)
+
+                # %% Save model
+                print('Saving model...')
+                save_params(exp)
 
                 # %% plot learning curves
 
@@ -1178,7 +1199,7 @@ def run_experiment(
                 f, axarr = plt.subplots(2, figsize=(15,15))
                 exp.epochs_df.loc[:,['train_loss','valid_loss','test_loss']].plot(ax=axarr[0], title='loss function',  logy=True)
                 exp.epochs_df.loc[:,['train_corr','valid_corr','test_corr']].plot(ax=axarr[1], title='correlation')
-                plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_lc.png', bbox_inches='tight')
+                plt.savefig(exp.model_base_name + '_fig_lc.png', bbox_inches='tight')
 
                 # %% evaluation on train set
                 all_preds = []
@@ -1198,6 +1219,8 @@ def run_experiment(
                 # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
                 (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                 mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                print('Saving training set predictions...')
+                np.savez(exp.model_base_name + '_train_preds.npz', targets_per_trial, preds_per_trial)
 
                 # %% plot predicted rating
                 plt.rcParams.update({'font.size': 24})
@@ -1211,7 +1234,7 @@ def run_experiment(
                 plt.ylabel('subjective rating')
                 plt.ylim(-1, 1)
                 plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_pred_train.png',
+                plt.savefig(exp.model_base_name + '_fig_pred_train.png',
                             bbox_inches='tight', dpi=300)
 
                 # %% evaluation on validation set
@@ -1233,6 +1256,8 @@ def run_experiment(
                     # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
                     (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                     mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                    print('Saving validation set predictions...')
+                    np.savez(exp.model_base_name + '_valid_preds.npz', targets_per_trial, preds_per_trial)
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
@@ -1246,7 +1271,7 @@ def run_experiment(
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
                     plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                    plt.savefig(dir_output_data + '/' + subjName + save_addon_text + '_fig_pred_valid.png',
+                    plt.savefig(exp.model_base_name + '_fig_pred_valid.png',
                                 bbox_inches='tight', dpi=300)
 
                 # %% evaluation on test set
@@ -1268,6 +1293,8 @@ def run_experiment(
                     #corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
                     (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                     mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                    print('Saving test set predictions...')
+                    np.savez(exp.model_base_name + '_test_preds.npz', targets_per_trial, preds_per_trial)
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
@@ -1316,9 +1343,9 @@ def run_experiment(
                     freqs = np.fft.rfftfreq(perm_X.shape[2],d=1/250.)
                     for l in range(len(phase_pert_corrs)):
                         layer_cc = phase_pert_corrs[l]
-                        scipy.io.savemat(dir_output_data + '/' + subjName +  save_addon_text + '_phiPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
+                        scipy.io.savemat(exp.model_base_name + '_phiPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
                         layer_cc = amp_pert_corrs[l]
-                        scipy.io.savemat(dir_output_data + '/' + subjName +  save_addon_text + '_ampPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
+                        scipy.io.savemat(exp.model_base_name + '_ampPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
 
                 print('Deleting model and experiment...')
                 del exp, model
