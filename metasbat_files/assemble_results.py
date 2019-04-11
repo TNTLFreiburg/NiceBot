@@ -87,7 +87,72 @@ for i_config in configurations.index:
 # configurations.to_csv(configurations_file[:-4] + '_with_results.csv')
 # Somehow converts my lists into strings!!!
 
-#%% TODO: Make a function to check for missing results only instead of having to rerun the above every time
+#%% Load only missing results only instead of having to rerun the above every time
+for i_config in configurations.index:
+    if configurations.loc[i_config, 'config_has_run'] == False:
+        result_folder = configurations.loc[i_config, 'result_folder']
+        unique_id = configurations.loc[i_config, 'unique_id']
+        matching_results = np.sort(glob.glob('/mnt/meta-cluster/' + result_folder + '/*' + unique_id + '.csv'))
+        # matching_results = np.sort(glob.glob(result_folder + '/*' + unique_id[:7] + '.csv'))
+        # Check that we get only one result per subject, but not sure what to do if not. Check that results are identical?
+
+        # I have to do this ugly thing here because initializing with 3 nans is somehow not possible because pandas sets
+        # the dtype of the cell as float instead ob object
+        configurations.loc[i_config, 'config_has_run'] = False
+        configurations.loc[i_config, 'mse_train'] = False
+        configurations.loc[i_config, 'mse_valid'] = False
+        configurations.loc[i_config, 'mse_test'] = False
+        configurations.loc[i_config, 'corr_train'] = False
+        configurations.loc[i_config, 'corr_valid'] = False
+        configurations.loc[i_config, 'corr_test'] = False
+        configurations.loc[i_config, 'corr_p_train'] = False
+        configurations.loc[i_config, 'corr_p_valid'] = False
+        configurations.loc[i_config, 'corr_p_test'] = False
+
+        if any(matching_results):
+            configurations.loc[i_config, 'config_has_run'] = True
+            configurations.loc[i_config, 'mse_train'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'mse_valid'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'mse_test'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_train'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_valid'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_test'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_p_train'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_p_valid'] = [[np.nan], [np.nan], [np.nan]]
+            configurations.loc[i_config, 'corr_p_test'] = [[np.nan], [np.nan], [np.nan]]
+            i_subject = -1
+            for subject in matching_results:
+                i_subject += 1
+                df = pd.read_csv(subject)#, names=['epoch',
+                                                 # 'train_loss','valid_loss','test_loss',
+                                                 # 'train_corr','valid_corr','test_corr', 'runtime'])
+                if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
+                    for column_name in df.columns:
+                        if column_name == 'train_loss':
+                            configurations.loc[i_config, 'mse_train'][i_subject] = df.tail(1)[column_name].values[0]#, 1]
+                        if column_name == 'valid_loss':
+                            configurations.loc[i_config, 'mse_valid'][i_subject] = df.tail(1)[column_name].values[0]#, 2]
+                        if column_name == 'test_loss':
+                            configurations.loc[i_config, 'mse_test'][i_subject] = df.tail(1)[column_name].values[0]#, 3]
+                        if column_name == 'train_corr':
+                            configurations.loc[i_config, 'corr_train'][i_subject] = df.tail(1)[column_name].values[0]#, 4]
+                        if column_name == 'valid_corr':
+                            configurations.loc[i_config, 'corr_valid'][i_subject] = df.tail(1)[column_name].values[0]#, 5]
+                        if column_name == 'test_corr':
+                            configurations.loc[i_config, 'corr_test'][i_subject] = df.tail(1)[column_name].values[0]#, 6]
+                elif configurations.loc[i_config, 'model_name'] in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
+                    configurations.loc[i_config, 'mse_train'][i_subject] = df.values[0, 1]
+                    configurations.loc[i_config, 'mse_valid'][i_subject] = df.values[4, 1]
+                    configurations.loc[i_config, 'mse_test'][i_subject] = df.values[8, 1]
+                    configurations.loc[i_config, 'corr_train'][i_subject] = df.values[1, 1]
+                    configurations.loc[i_config, 'corr_valid'][i_subject] = df.values[5, 1]
+                    configurations.loc[i_config, 'corr_test'][i_subject] = df.values[9, 1]
+                    configurations.loc[i_config, 'corr_p_train'][i_subject] = df.values[2, 1]
+                    configurations.loc[i_config, 'corr_p_valid'][i_subject] = df.values[6, 1]
+                    configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[10, 1]
+                else:
+                    print('Unknown model name: {}'.format(configurations.loc[i_config, 'model_name']))
+                    break
 
 #%% Plot comparison matrix
 mat_padding = ((10, 10), (10, 10))
