@@ -888,7 +888,6 @@ def run_experiment(
                 print('Negative validation set seconds not supported!')
                 return
 
-
             train_set.X[0] = np.array(np.float32(train_set.X[0][:, :cut_ind_valid]))
             train_set.y = np.float32(train_set.y[:,:cut_ind_valid])
 
@@ -922,7 +921,7 @@ def run_experiment(
                 print('Testing on train data...')
                 train_set_pred = regr.predict(train_set.X[0].T)
                 print('Saving training set predictions...')
-                joblib.dump([train_set.X[0].T, train_set_pred], model_base_name + '_train_preds.plk.z')
+                joblib.dump([train_set.y.T, train_set_pred], model_base_name + '_train_preds.plk.z')
 
                 # Metrics
                 mse_train = mean_squared_error(train_set.y.T, train_set_pred)
@@ -938,7 +937,7 @@ def run_experiment(
                     print('Testing on validation data...')
                     valid_set_pred = regr.predict(valid_set.X[0].T)
                     print('Saving validation set predictions...')
-                    joblib.dump([valid_set.X[0].T, valid_set_pred], model_base_name + '_valid_preds.pkl.z')
+                    joblib.dump([valid_set.y.T, valid_set_pred], model_base_name + '_valid_preds.pkl.z')
 
                     # Metrics
                     mse_valid = mean_squared_error(valid_set.y.T, valid_set_pred)
@@ -959,7 +958,7 @@ def run_experiment(
                 print('Testing on test data...')
                 test_set_pred = regr.predict(test_set.X[0].T)
                 print('Saving test set predictions...')
-                joblib.dump([test_set.X[0].T, test_set_pred], model_base_name + '_test_preds.pkl.z')
+                joblib.dump([test_set.y.T, test_set_pred], model_base_name + '_test_preds.pkl.z')
 
                 # Metrics
                 mse_test = mean_squared_error(test_set.y.T, test_set_pred)

@@ -842,17 +842,17 @@ def run_experiment(
                 print('Testing on test data...')
                 test_set_pred = regr.predict(test_set.X[0].T)
                 print('Saving test set predictions...')
-                joblib.dump([test_set.X[0].T, test_set_pred], subject_base_name + '_test_preds.pkl.z')
+                joblib.dump([test_set.y.T, test_set_pred], subject_base_name + '_test_preds.pkl.z')
 
                 # Metrics
                 mse_test = mean_squared_error(test_set.y.T, test_set_pred)
                 var_score_test = r2_score(test_set.y.T, test_set_pred)
                 corrcoef_test, pval_test = pearsonr(test_set_pred, test_set.y.T[:, 0])
-                print(
-                    "Test {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name, mse_test,
-                                                                                                  var_score_test,
-                                                                                                  corrcoef_test,
-                                                                                                  pval_test))
+                print("Test {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(subject_base_name,
+                                                                                                    mse_test,
+                                                                                                    var_score_test,
+                                                                                                    corrcoef_test,
+                                                                                                    pval_test))
 
                 # Save metrics
                 print('Saving results...')
@@ -1059,9 +1059,24 @@ def run_experiment(
                     targets_per_trial = compute_preds_per_trial_from_crops(ys_2d, input_time_length, dataset.X)[0][0]
                     assert preds_per_trial.shape == targets_per_trial.shape
 
-                    #corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
-                    (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
-                    mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                    # Metrics
+                    mse_test = mean_squared_error(targets_per_trial, preds_per_trial)
+                    var_score_test = r2_score(targets_per_trial, preds_per_trial)
+                    corrcoef_test, pval_test = pearsonr(targets_per_trial, preds_per_trial)
+                    print(
+                        "Test {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(subject_base_name,
+                                                                                                      mse_test,
+                                                                                                      var_score_test,
+                                                                                                      corrcoef_test,
+                                                                                                      pval_test))
+
+                    # Save metrics
+                    print('Saving results...')
+                    result_df = pd.Series({'Test mse': mse_test, 'Test corr': corrcoef_test, 'Test corr p':
+                        pval_test, 'Test explained variance': var_score_test,
+                                           }).to_frame(subject_base_name)
+                    result_df.to_csv(subject_base_name + '.csv', sep=',', header=True)
+
                     print('Saving test set predictions...')
                     joblib.dump([targets_per_trial, preds_per_trial], subject_base_name + '_test_preds.pkl.z')
 
