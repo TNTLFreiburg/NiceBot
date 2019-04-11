@@ -18,9 +18,10 @@ os.sys.path.append('/home/fiederer/nicebot/deepRegressionCode/')
 from arg_parser import parse_run_args
 import time
 import fnmatch
+import shortuuid
 import glob
 import pandas as pd
-import joblib # to load models
+import joblib # to save models
 import re
 #from braindecode.torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
 os.sys.path.append('/home/fiederer/adamw-eeg-eval/')
@@ -61,6 +62,7 @@ import torch as th
 from torch import optim
 from torch import nn
 import torch.nn.functional as F
+from torch.nn.functional import elu
 from torch.nn import init
 
 from braindecode.torch_ext.modules import Expression
@@ -721,7 +723,7 @@ def run_experiment(
             m = re.search('model', model_base_name)
             # TODO: Some assertion here would ne nice to check that there is only one 'model' in model_file but
             #  unfortunately re.search stops at the first match...
-            model_base_name = result_folder + '/' + model_base_name[:m.span(0)[0] - 1]
+            model_base_name = model_base_name[:m.span(0)[0] - 1]
             del m
 
             # Check if across subject experiment has already been run. If so go to next subject
