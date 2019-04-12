@@ -34,9 +34,9 @@ for i_config in configurations.index:
         for subject in matching_results:
             i_subject += 1
             df = pd.read_csv(subject)
-            if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
-                # TODO: THIS WILL NOT WORK FOR THE ACROSS SUBJECT CSV FILES!!!! EITHER NEED TO CHANGE FILES OR NEED
-                #  TO CATCH HERE!
+            # if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
+            if len(df) == configurations.loc[i_config, 'max_epochs']+1:  # then these are the results of the training
+                # of a cnn model
                 for column_name in df.columns:
                     if column_name == 'train_loss':
                         configurations.loc[i_config, 'mse_train'][i_subject] = df.tail(1)[column_name].values[0]#, 1]
@@ -50,7 +50,8 @@ for i_config in configurations.index:
                         configurations.loc[i_config, 'corr_valid'][i_subject] = df.tail(1)[column_name].values[0]#, 5]
                     if column_name == 'test_corr':
                         configurations.loc[i_config, 'corr_test'][i_subject] = df.tail(1)[column_name].values[0]#, 6]
-            elif configurations.loc[i_config, 'model_name'] in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
+            elif len(df) == 12:  # these are the results of the training of a non-cnn model
+            # elif configurations.loc[i_config, 'model_name'] in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
                 configurations.loc[i_config, 'mse_train'][i_subject] = df.values[0, 1]
                 configurations.loc[i_config, 'mse_valid'][i_subject] = df.values[4, 1]
                 configurations.loc[i_config, 'mse_test'][i_subject] = df.values[8, 1]
@@ -60,8 +61,14 @@ for i_config in configurations.index:
                 configurations.loc[i_config, 'corr_p_train'][i_subject] = df.values[2, 1]
                 configurations.loc[i_config, 'corr_p_valid'][i_subject] = df.values[6, 1]
                 configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[10, 1]
+            elif len(df) == 4:  # these are the results of a transfer
+                configurations.loc[i_config, 'mse_test'][i_subject] = df.values[0, 1]
+                configurations.loc[i_config, 'corr_test'][i_subject] = df.values[1, 1]
+                configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[2, 1]
+
             else:
-                print('Unknown model name: {}'.format(configurations.loc[i_config, 'model_name']))
+                # print('Unknown model name: {}'.format(configurations.loc[i_config, 'model_name']))
+                print('Unknown csv layout with len {:d}'.format(len(df)))
                 break
 
 # configurations.to_csv(configurations_file[:-4] + '_with_results.csv')
@@ -82,33 +89,42 @@ for i_config in configurations.index:
             for subject in matching_results:
                 i_subject += 1
                 df = pd.read_csv(subject)
-                if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
-                    for column_name in df.columns:
-                        if column_name == 'train_loss':
-                            configurations.loc[i_config, 'mse_train'][i_subject] = df.tail(1)[column_name].values[0]
-                        if column_name == 'valid_loss':
-                            configurations.loc[i_config, 'mse_valid'][i_subject] = df.tail(1)[column_name].values[0]
-                        if column_name == 'test_loss':
-                            configurations.loc[i_config, 'mse_test'][i_subject] = df.tail(1)[column_name].values[0]
-                        if column_name == 'train_corr':
-                            configurations.loc[i_config, 'corr_train'][i_subject] = df.tail(1)[column_name].values[0]
-                        if column_name == 'valid_corr':
-                            configurations.loc[i_config, 'corr_valid'][i_subject] = df.tail(1)[column_name].values[0]
-                        if column_name == 'test_corr':
-                            configurations.loc[i_config, 'corr_test'][i_subject] = df.tail(1)[column_name].values[0]
-                elif configurations.loc[i_config, 'model_name'] in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
-                    configurations.loc[i_config, 'mse_train'][i_subject] = df.values[0, 1]
-                    configurations.loc[i_config, 'mse_valid'][i_subject] = df.values[4, 1]
-                    configurations.loc[i_config, 'mse_test'][i_subject] = df.values[8, 1]
-                    configurations.loc[i_config, 'corr_train'][i_subject] = df.values[1, 1]
-                    configurations.loc[i_config, 'corr_valid'][i_subject] = df.values[5, 1]
-                    configurations.loc[i_config, 'corr_test'][i_subject] = df.values[9, 1]
-                    configurations.loc[i_config, 'corr_p_train'][i_subject] = df.values[2, 1]
-                    configurations.loc[i_config, 'corr_p_valid'][i_subject] = df.values[6, 1]
-                    configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[10, 1]
-                else:
-                    print('Unknown model name: {}'.format(configurations.loc[i_config, 'model_name']))
-                    break
+            # if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
+            if len(df) == configurations.loc[i_config, 'max_epochs']+1:  # then these are the results of the training
+                # of a cnn model
+                for column_name in df.columns:
+                    if column_name == 'train_loss':
+                        configurations.loc[i_config, 'mse_train'][i_subject] = df.tail(1)[column_name].values[0]#, 1]
+                    if column_name == 'valid_loss':
+                        configurations.loc[i_config, 'mse_valid'][i_subject] = df.tail(1)[column_name].values[0]#, 2]
+                    if column_name == 'test_loss':
+                        configurations.loc[i_config, 'mse_test'][i_subject] = df.tail(1)[column_name].values[0]#, 3]
+                    if column_name == 'train_corr':
+                        configurations.loc[i_config, 'corr_train'][i_subject] = df.tail(1)[column_name].values[0]#, 4]
+                    if column_name == 'valid_corr':
+                        configurations.loc[i_config, 'corr_valid'][i_subject] = df.tail(1)[column_name].values[0]#, 5]
+                    if column_name == 'test_corr':
+                        configurations.loc[i_config, 'corr_test'][i_subject] = df.tail(1)[column_name].values[0]#, 6]
+            elif len(df) == 12:  # these are the results of the training of a non-cnn model
+            # elif configurations.loc[i_config, 'model_name'] in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
+                configurations.loc[i_config, 'mse_train'][i_subject] = df.values[0, 1]
+                configurations.loc[i_config, 'mse_valid'][i_subject] = df.values[4, 1]
+                configurations.loc[i_config, 'mse_test'][i_subject] = df.values[8, 1]
+                configurations.loc[i_config, 'corr_train'][i_subject] = df.values[1, 1]
+                configurations.loc[i_config, 'corr_valid'][i_subject] = df.values[5, 1]
+                configurations.loc[i_config, 'corr_test'][i_subject] = df.values[9, 1]
+                configurations.loc[i_config, 'corr_p_train'][i_subject] = df.values[2, 1]
+                configurations.loc[i_config, 'corr_p_valid'][i_subject] = df.values[6, 1]
+                configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[10, 1]
+            elif len(df) == 4:  # these are the results of a transfer
+                configurations.loc[i_config, 'mse_test'][i_subject] = df.values[0, 1]
+                configurations.loc[i_config, 'corr_test'][i_subject] = df.values[1, 1]
+                configurations.loc[i_config, 'corr_p_test'][i_subject] = df.values[2, 1]
+
+            else:
+                # print('Unknown model name: {}'.format(configurations.loc[i_config, 'model_name']))
+                print('Unknown csv layout with len {:d}'.format(len(df)))
+                break
 
 #%% Plot fancy results
 # configurations_file = '/mnt/meta-cluster/home/fiederer/nicebot/metasbat_files/configs_all_models_with_results.csv'
