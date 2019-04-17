@@ -845,15 +845,19 @@ def run_experiment(
                 print('Keeping only EEG channels matching patter {:s}'.format(electrodes))
                 cnt.pick_channels(fnmatch.filter(cnt.ch_names, electrodes) + sensor_names_aux + sensor_names_robot)
                 print('Band-passing data from {:s} to {:s} Hz'.format(str(band_pass[0]), str(band_pass[1])))
-                try:
+                if electrodes == '*':
                     cnt.filter(band_pass[0], band_pass[1], picks=range(32)) # This is somewhat dangerous but the first
                 # 32 channels should always be EEG channels in the selected data configs. Unfortunately it does not look
                 # like the types of the channels have been set properly to allow selecting using picks='eeg'
-                except:
-                    try:
+                elif electrodes == '*C*':
                         cnt.filter(band_pass[0], band_pass[1], picks=range(13))
-                    except:
+                elif electrodes == '*z':
                         cnt.filter(band_pass[0], band_pass[1], picks=range(8))
+                else:
+                    print('Unsupported electrode selection {:s}. Electrode selection can be * or *C* or *z'.format(
+                        electrodes))
+                    return
+
 
             # mne apply will apply the function to the data (a 2d-numpy-array)
             # have to transpose data back and forth, since
@@ -906,9 +910,9 @@ def run_experiment(
                 elif lin_svr:
                     regr = LinearSVR(verbose=3, random_state=20170629)#, max_iter=1000)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
                 elif rbf_svr:
-                    regr = SVR(verbose=3)#, max_iter=1000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
+                    regr = SVR(verbose=3, max_iter=100000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
                 elif rf_reg:
-                    regr = RandomForestRegressor(n_estimators=100, n_jobs=10, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
+                    regr = RandomForestRegressor(n_estimators=100, n_jobs=16, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
 
                 # Train the model using the training sets
                 print('Training traditional regression model...')
