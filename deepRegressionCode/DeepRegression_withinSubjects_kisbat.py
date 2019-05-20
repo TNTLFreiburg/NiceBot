@@ -756,7 +756,7 @@ def run_experiment(
     if only_robot_data:
         save_addon_text_tmp = save_addon_text_orig  + '_onlyRobotData'
     elif only_eeg_data:
-        save_addon_text_tmp = save_addon_text_orig  + 'onlyEEGData'
+        save_addon_text_tmp = save_addon_text_orig  + '_onlyEEGData'
     elif robot_eeg:
         save_addon_text_tmp = save_addon_text_orig  + '_RobotEEG'
     elif robot_eeg_aux:
