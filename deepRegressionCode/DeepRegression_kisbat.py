@@ -46,6 +46,8 @@ from braindecode.datautil.signalproc import bandpass_cnt, exponential_running_st
 from braindecode.datautil.trial_segment import create_signal_target_from_raw_mne
 from braindecode.torch_ext.constraints import MaxNormDefaultConstraint
 
+import matplotlib as mpl
+mpl.rcParams['agg.path.chunksize'] = 10000  # Fix to overflowError in draw_path
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from braindecode.visualization.perturbation import compute_amplitude_prediction_correlations
@@ -904,8 +906,8 @@ def run_experiment(
 
             # Check if experiment has already been run. If so go to next subject
             model_base_name = dir_output_data + '/' + subjName + save_addon_text
-            result_files = glob.glob(model_base_name + '_' + subjName + '.csv')
-            if result_files:
+            result_files = glob.glob(model_base_name + '_*Exp' + '.csv')
+            if len(result_files) == len(subjects):
                 print(subjName + save_addon_text + ' has already been run. Trying next subject.')
                 continue
 
