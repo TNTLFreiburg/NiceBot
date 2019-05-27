@@ -1001,7 +1001,7 @@ def run_experiment(
                     plt.figure(figsize=(32, 12))
                     t = np.arange(train_set_pred.shape[0]) / sampling_rate
                     plt.plot(t, train_set_pred)
-                    plt.plot(t, train_set[i_subject].y.T)
+                    plt.plot(t, train_set[i_eval_subject].y.T)
                     plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
                     plt.title(
                         'Train {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(model_name, mse_train, corrcoef_train,
@@ -1022,7 +1022,7 @@ def run_experiment(
                         plt.figure(figsize=(32, 12))
                         t = np.arange(valid_set_pred.shape[0])/sampling_rate
                         plt.plot(t, valid_set_pred)
-                        plt.plot(t, valid_set[i_subject].y.T)
+                        plt.plot(t, valid_set[i_eval_subject].y.T)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
                         plt.title('{:g}s validation {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_valid_set, model_name, mse_valid, corrcoef_valid, pval_valid))
                         plt.xlabel('time (s)')
@@ -1041,7 +1041,7 @@ def run_experiment(
                         plt.figure(figsize=(32, 12))
                         t = np.arange(test_set_pred.shape[0]) / sampling_rate
                         plt.plot(t, test_set_pred)
-                        plt.plot(t, test_set[i_subject].y.T)
+                        plt.plot(t, test_set[i_eval_subject].y.T)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
                         plt.title('{:g}s test {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_test_set, model_name, mse_test,
                                                                                        corrcoef_test, pval_test))
