@@ -883,7 +883,7 @@ def run_experiment(
                 valid_set[-1].y = np.float32(valid_set[-1].y[:,cut_ind_valid:cut_ind_test])
             elif n_seconds_valid_set == 0:
                 cut_ind_valid = cut_ind_test
-                valid_set = None
+                valid_set.append(None)
             else:
                 print('Negative validation set seconds not supported!')
                 return
