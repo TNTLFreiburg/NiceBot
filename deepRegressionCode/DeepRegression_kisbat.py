@@ -1235,7 +1235,8 @@ def run_experiment(
                     (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                     mse = mean_squared_error(targets_per_trial, preds_per_trial)
                     print('Saving training set predictions...')
-                    joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + subjects[i_eval_subject] + '_train_preds.pkl.z')
+                    joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[
+                                                                                                   i_eval_subject] + '_train_preds.pkl.z')
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
@@ -1249,7 +1250,7 @@ def run_experiment(
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
                     plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                    plt.savefig(exp.model_base_name + subjects[i_eval_subject] + '_fig_pred_train.png',
+                    plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.png',
                                 bbox_inches='tight', dpi=300)
 
                     # %% evaluation on validation set
@@ -1272,7 +1273,7 @@ def run_experiment(
                         (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                         mse = mean_squared_error(targets_per_trial, preds_per_trial)
                         print('Saving validation set predictions...')
-                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + subjects[i_eval_subject] + '_valid_preds.pkl.z')
+                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
 
                         # %% plot predicted rating
                         plt.rcParams.update({'font.size': 24})
@@ -1286,7 +1287,7 @@ def run_experiment(
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                        plt.savefig(exp.model_base_name + subjects[i_eval_subject] + '_fig_pred_valid.png',
+                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
                                     bbox_inches='tight', dpi=300)
 
                     # %% evaluation on test set
@@ -1309,7 +1310,7 @@ def run_experiment(
                         (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
                         mse = mean_squared_error(targets_per_trial, preds_per_trial)
                         print('Saving test set predictions...')
-                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + subjects[i_eval_subject] + '_test_preds.pkl.z')
+                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
 
                         # %% plot predicted rating
                         plt.rcParams.update({'font.size': 24})
@@ -1323,7 +1324,7 @@ def run_experiment(
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
                         plt.xlim(0,  int(np.round(preds_per_trial.shape[0]/sampling_rate)))
-                        plt.savefig(exp.model_base_name + subjects[i_eval_subject] + '_fig_pred_test.png', bbox_inches='tight', dpi=300)
+                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png', bbox_inches='tight', dpi=300)
                         log.info("-----------------------------------------")
 
                     plt.close('all')
