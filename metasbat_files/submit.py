@@ -42,7 +42,9 @@ def main():
     # python_path = '/home/fiederer/nicebot'
     source_call = 'source /home/fiederer/.bashrc'
     virtual_env = 'conda activate braindecode'
-    python_file = ('/home/fiederer/nicebot/deepRegressionCode/DeepRegression_withinSubjects_kisbat.py')
+    python_file = ('/home/fiederer/nicebot/deepRegressionCode/DeepRegression_kisbat.py')
+    # python_file = ('/home/fiederer/nicebot/deepRegressionCode/DeepRegression_acrossSubjects_kisbat.py')
+    # python_file = ('/home/fiederer/nicebot/deepRegressionCode/DeepRegression_withinSubjects_kisbat.py')
 
     # specify temporary job file and command to submit
     # schedule to different hosts. only one jost per host
@@ -58,19 +60,23 @@ def main():
         model_name = configs_df[setting]['model_name']
         if any([model_name == a for a in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']]):
             # Specify queue
+            # queue = "ml_gpu-rtx2080"
             # queue = 'ml_cpu-ivy'
             queue = 'cpu_ivy'
             if model_name == 'rf_reg':
                 batch_submit = "sbatch -p {queue} -c 16 {script_name}"
             else:
                 batch_submit = "sbatch -p {queue} -c 1 {script_name}"
+            # batch_submit = "sbatch -p {queue} -c 1 --gres=gpu:0 {script_name}"
         elif any([model_name == a for a in ['eegnet', 'deep4', 'resnet']]):
-            queue = "meta_gpu-black"
-            # queue = "ml_gpu-rtx2080"
+            # queue = "meta_gpu-black"
+            queue = "ml_gpu-rtx2080"
+            # queue = "meta_gpu-ti"
             batch_submit = "sbatch -p {queue} -c 2 --gres=gpu:1 {script_name}"
         else:
             os.warnin('Cannot define queue for model {:s}'.format(model_name))
 
+        # configs_df[setting]['result_folder'] = '/data/schirrmr/fiederer/nicebot/results'
         config = configs_df[setting].to_dict()
         # create a tmp job file / job for every config
         cmd_args = dict_to_cmd_args(config)
