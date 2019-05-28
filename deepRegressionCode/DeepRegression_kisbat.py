@@ -910,6 +910,9 @@ def run_experiment(
             if len(result_files) == len(subjects):
                 print(subjName + save_addon_text + ' has already been run. Trying next subject.')
                 continue
+            elif len(result_files) > len(subjects):
+                print(subjName + save_addon_text + ' has more result files than allowed. Please check!')
+                return
 
             if model_name in ['lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']:
                 # insert traditional ML here
@@ -1202,7 +1205,7 @@ def run_experiment(
                     print('WARNING: the epoch dataframe has too few epochs: {:d}'.format(len(exp.epochs_df)))
 
                 print('Saving epoch dataframe...')
-                exp.epochs_df.to_csv(exp.model_base_name + '.csv', sep=',', header=True)
+                exp.epochs_df.to_csv(exp.model_base_name + '_epochs.csv', sep=',', header=True)
 
                 # %% Save model
                 print('Saving model...')
@@ -1234,8 +1237,9 @@ def run_experiment(
                     assert preds_per_trial.shape == targets_per_trial.shape
 
                     # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
-                    (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
-                    mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                    (corrcoef_train, pval_train) = pearsonr(targets_per_trial, preds_per_trial)
+                    mse_train = mean_squared_error(targets_per_trial, preds_per_trial)
+                    var_score_train = r2_score(targets_per_trial, preds_per_trial)
                     print('Saving training set predictions...')
                     joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[
                                                                                                    i_eval_subject] + '_train_preds.pkl.z')
@@ -1247,7 +1251,7 @@ def run_experiment(
                     plt.plot(t, preds_per_trial)
                     plt.plot(t, targets_per_trial)
                     plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                    plt.title('Train set: mse = {:f}, r = {:f}, p = {:f}'.format(mse, corrcoefs, pval))
+                    plt.title('Train set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_train, corrcoef_train, pval_train))
                     plt.xlabel('time (s)')
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
@@ -1272,8 +1276,9 @@ def run_experiment(
                         assert preds_per_trial.shape == targets_per_trial.shape
 
                         # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
-                        (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
-                        mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                        (corrcoef_valid, pval_valid) = pearsonr(targets_per_trial, preds_per_trial)
+                        mse_valid = mean_squared_error(targets_per_trial, preds_per_trial)
+                        var_score_valid = r2_score(targets_per_trial, preds_per_trial)
                         print('Saving validation set predictions...')
                         joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
 
@@ -1284,13 +1289,18 @@ def run_experiment(
                         plt.plot(t, preds_per_trial)
                         plt.plot(t, targets_per_trial)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                        plt.title('Validation set: mse = {:f}, r = {:f}, p = {:f}'.format(mse, corrcoefs, pval))
+                        plt.title('Validation set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_valid, corrcoef_valid, pval_valid))
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
                         plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
                                     bbox_inches='tight', dpi=300)
+                    else:
+                        mse_valid = np.nan
+                        var_score_valid = np.nan
+                        corrcoef_valid = np.nan
+                        pval_valid = np.nan
 
                     # %% evaluation on test set
                     if n_seconds_test_set > 0:
@@ -1309,8 +1319,9 @@ def run_experiment(
                         assert preds_per_trial.shape == targets_per_trial.shape
 
                         #corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
-                        (corrcoefs, pval) = pearsonr(targets_per_trial, preds_per_trial)
-                        mse = mean_squared_error(targets_per_trial, preds_per_trial)
+                        (corrcoef_test, pval_test) = pearsonr(targets_per_trial, preds_per_trial)
+                        mse_test = mean_squared_error(targets_per_trial, preds_per_trial)
+                        var_score_test = r2_score(targets_per_trial, preds_per_trial)
                         print('Saving test set predictions...')
                         joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
 
@@ -1321,15 +1332,32 @@ def run_experiment(
                         plt.plot(t, preds_per_trial)
                         plt.plot(t, targets_per_trial)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                        plt.title('Test set: mse = {:f}, r = {:f}, p = {:f}'.format(mse, corrcoefs, pval))
+                        plt.title('Test set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_test, corrcoef_test, pval_test))
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
-                        plt.xlim(0,  int(np.round(preds_per_trial.shape[0]/sampling_rate)))
+                        plt.xlim(0, int(np.round(preds_per_trial.shape[0]/sampling_rate)))
                         plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png', bbox_inches='tight', dpi=300)
                         log.info("-----------------------------------------")
+                    else:
+                        mse_test = np.nan
+                        var_score_test = np.nan
+                        corrcoef_test = np.nan
+                        pval_test = np.nan
 
                     plt.close('all')
+
+                    # Save metrics
+                    print('Saving results...')
+                    result_df = pd.Series({'Train mse': mse_train, 'Train corr': corrcoef_train, 'Train corr p':
+                        pval_train, 'Train explained variance': var_score_train,
+                                           'Validation mse': mse_valid, 'Validation corr': corrcoef_valid,
+                                           'Validation corr p':
+                                               pval_valid, 'Validation explained variance': var_score_valid,
+                                           'Test mse': mse_test, 'Test corr': corrcoef_test, 'Test corr p':
+                                               pval_test, 'Test explained variance': var_score_test,
+                                           }).to_frame(subjName + save_addon_text + '_' + subjects[i_eval_subject])
+                    result_df.to_csv(model_base_name + '_' + subjects[i_eval_subject] + '.csv', sep=',', header=True)
 
                 if calc_viz:
                     # %% visualization (Kay): Wrap Model into SelectiveSequential and set up pred_fn
