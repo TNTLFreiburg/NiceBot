@@ -1,4 +1,3 @@
-
 import logging
 import sys
 
@@ -8,7 +7,7 @@ from visualizations.perturbation import SelectiveSequential, phase_perturbation,
     correlate_feature_maps, mean_diff_feature_maps, perturbation_correlation
 
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
-                     level=logging.DEBUG, stream=sys.stdout)
+                    level=logging.DEBUG, stream=sys.stdout)
 log = logging.getLogger()
 
 from collections import OrderedDict
@@ -21,8 +20,8 @@ import shortuuid
 import glob
 import pandas as pd
 import numpy as np
-import joblib # to save models
-#from braindecode.torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
+import joblib  # to save models
+# from braindecode.torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, cut_cos, CutCosineAnnealing
 from torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, CutCosineAnnealing
 from torch_ext.optimizers import AdamW
 
@@ -77,33 +76,33 @@ def save_params(exp):
     log.info("Save trainer params to {:s}".format(filename))
     th.save(exp.optimizer.state_dict(), filename)
 
+
 ########################################################################################################
 
 
 def run_experiment(
-    unique_id=shortuuid.uuid(),
-    data_folder='/data/schirrmr/fiederer/nicebot/data',
-    batch_size=64,
-    max_epochs=200,
-    cuda=True,
-    result_folder='/data/schirrmr/fiederer/nicebot/results',
-    model_name='eegnet',
-    init_lr=0.001,
-    weight_decay=0,
-    band_pass=[None, None],
-    electrodes='*',
-    sampling_rate=256,
-    n_seconds_test_set=180,
-    n_seconds_valid_set=180,
-    data='onlyRobotData'
+        unique_id=shortuuid.uuid(),
+        data_folder='/data/schirrmr/fiederer/nicebot/data',
+        batch_size=64,
+        max_epochs=200,
+        cuda=True,
+        result_folder='/data/schirrmr/fiederer/nicebot/results',
+        model_name='eegnet',
+        init_lr=0.001,
+        weight_decay=0,
+        band_pass=[None, None],
+        electrodes='*',
+        sampling_rate=256,
+        n_seconds_test_set=180,
+        n_seconds_valid_set=180,
+        data='onlyRobotData'
 ):
-
     # Set if you want to use GPU
-        # You can also use torch.cuda.is_available() to determine if cuda is available on your machine.
+    # You can also use torch.cuda.is_available() to determine if cuda is available on your machine.
     cuda = cuda
     gpu_index = 0
 
-    subjects =['noExp', 'moderateExp', 'substantialExp']
+    subjects = ['noExp', 'moderateExp', 'substantialExp']
 
     n_seconds_test_set = n_seconds_test_set
     n_seconds_valid_set = n_seconds_valid_set
@@ -121,7 +120,7 @@ def run_experiment(
     n_perturbations = 20
 
     # which model
-    model_name=model_name # deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg
+    model_name = model_name  # deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg
     deep4 = False
     res_net = False
     eeg_net_v4 = False
@@ -144,7 +143,8 @@ def run_experiment(
     elif model_name == 'rf_reg':
         rf_reg = True
     else:
-        print('Wrong model_name {}. model_name can be deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg.'.format(model_name))
+        print('Wrong model_name {}. model_name can be deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg.'.format(
+            model_name))
         return
 
     # which EEG frequency band
@@ -153,7 +153,7 @@ def run_experiment(
     # which EEG electrodes
     electrodes = electrodes
 
-    #storage
+    # storage
     dir_output_data = result_folder
     if not os.path.exists(dir_output_data):
         os.makedirs(dir_output_data)
@@ -194,23 +194,24 @@ def run_experiment(
         only_aux = False
         robot_aux = False
     else:
-        print('Wrong data type {}. data can be onlyRobotData, onlyEEGData, onlyAux, RobotEEGAux, RobotEEG.'.format(data))
+        print(
+            'Wrong data type {}. data can be onlyRobotData, onlyEEGData, onlyAux, RobotEEGAux, RobotEEG.'.format(data))
         return
 
     if only_robot_data:
-        save_addon_text_tmp = save_addon_text_orig  + '_onlyRobotData'
+        save_addon_text_tmp = save_addon_text_orig + '_onlyRobotData'
     elif only_eeg_data:
-        save_addon_text_tmp = save_addon_text_orig  + '_onlyEEGData'
+        save_addon_text_tmp = save_addon_text_orig + '_onlyEEGData'
     elif robot_eeg:
-        save_addon_text_tmp = save_addon_text_orig  + '_RobotEEG'
+        save_addon_text_tmp = save_addon_text_orig + '_RobotEEG'
     elif robot_eeg_aux:
-        save_addon_text_tmp = save_addon_text_orig  + '_RobotEEGAux'
+        save_addon_text_tmp = save_addon_text_orig + '_RobotEEGAux'
     elif only_aux:
-        save_addon_text_tmp = save_addon_text_orig  + '_onlyAuxData'
+        save_addon_text_tmp = save_addon_text_orig + '_onlyAuxData'
     elif robot_aux:
-        save_addon_text_tmp = save_addon_text_orig  + '_RobotAux'
+        save_addon_text_tmp = save_addon_text_orig + '_RobotAux'
 
-    for adam in [False]: # [True, False]:
+    for adam in [False]:  # [True, False]:
 
         if adam:
             save_addon_text = save_addon_text_tmp + '_adam'
@@ -220,7 +221,7 @@ def run_experiment(
         if deep4:
             save_addon_text = save_addon_text + '_Deep4Net_stride' + str(pool_time_stride)
             if pool_time_stride is 2:
-                time_window_duration = 1825 #ms
+                time_window_duration = 1825  # ms
             elif pool_time_stride is 3:
                 time_window_duration = 3661  # ms
             else:
@@ -229,7 +230,7 @@ def run_experiment(
             # deep4 stride 2: 1825
             # deep4 stride 3: 3661
         elif res_net:
-            time_window_duration = 1005 #ms
+            time_window_duration = 1005  # ms
             save_addon_text = save_addon_text + '_ResNet'
         elif eeg_net_v4:
             time_window_duration = 1335
@@ -254,19 +255,20 @@ def run_experiment(
 
             print('Loading data...')
             if only_robot_data:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names_robot).load() # robot pos channels
+                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names_robot).load()  # robot pos channels
             elif only_eeg_data:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load() # all channels
+                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load()  # all channels
                 cnt = cnt.drop_channels(sensor_names_robot_aux)
             elif robot_eeg:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load() # all channels
+                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load()  # all channels
                 cnt = cnt.drop_channels(sensor_names_aux)
             elif robot_eeg_aux:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load() # all channels
+                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names).load()  # all channels
             elif only_aux:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names_aux).load() # aux channels
+                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names_aux).load()  # aux channels
             elif robot_aux:
-                cnt = BBCIDataset(train_filename, load_sensor_names=sensor_names_robot_aux).load() # robot pos and aux channels
+                cnt = BBCIDataset(train_filename,
+                                  load_sensor_names=sensor_names_robot_aux).load()  # robot pos and aux channels
 
             # load score
             score_filename = data_folder + '/BBCIformat/' + subjName + '_score.mat'
@@ -286,45 +288,46 @@ def run_experiment(
                 cnt.pick_channels(fnmatch.filter(cnt.ch_names, electrodes) + sensor_names_aux + sensor_names_robot)
                 print('Band-passing data from {:s} to {:s} Hz'.format(str(band_pass[0]), str(band_pass[1])))
                 if electrodes == '*':
-                    cnt.filter(band_pass[0], band_pass[1], picks=range(32)) # This is somewhat dangerous but the first
+                    cnt.filter(band_pass[0], band_pass[1], picks=range(32))  # This is somewhat dangerous but the first
                 # 32 channels should always be EEG channels in the selected data configs. Unfortunately it does not look
                 # like the types of the channels have been set properly to allow selecting using picks='eeg'
                 elif electrodes == '*C*':
-                        cnt.filter(band_pass[0], band_pass[1], picks=range(13))
+                    cnt.filter(band_pass[0], band_pass[1], picks=range(13))
                 elif electrodes == '*z':
-                        cnt.filter(band_pass[0], band_pass[1], picks=range(8))
+                    cnt.filter(band_pass[0], band_pass[1], picks=range(8))
                 else:
                     print('Unsupported electrode selection {:s}. Electrode selection can be * or *C* or *z'.format(
                         electrodes))
                     return
-
 
             # mne apply will apply the function to the data (a 2d-numpy-array)
             # have to transpose data back and forth, since
             # exponential_running_standardize expects time x chans order
             # while mne object has chans x time order
             cnt = mne_apply(lambda a: exponential_running_standardize(
-            a, init_block_size=1000,factor_new=0.001, eps=1e-4),
-            cnt)
+                a, init_block_size=1000, factor_new=0.001, eps=1e-4),
+                            cnt)
 
             name_to_start_codes = OrderedDict([('ScoreExp', 1)])
             name_to_stop_codes = OrderedDict([('ScoreExp', 2)])
 
             print('Splitting data...')
-            train_set.append(create_signal_target_from_raw_mne(cnt, name_to_start_codes, [0,0], name_to_stop_codes))
+            train_set.append(create_signal_target_from_raw_mne(cnt, name_to_start_codes, [0, 0], name_to_stop_codes))
 
-            train_set[-1].y = score[:,:-1]
+            train_set[-1].y = score[:, :-1]
             # split data and test set
-            cut_ind_test = int(np.size(train_set[-1].y) - n_seconds_test_set*sampling_rate) # use last nSecondsTestSet as test set
+            cut_ind_test = int(
+                np.size(train_set[-1].y) - n_seconds_test_set * sampling_rate)  # use last nSecondsTestSet as test set
             test_set.append(deepcopy(train_set[-1]))
             test_set[-1].X[0] = np.array(np.float32(test_set[-1].X[0][:, cut_ind_test:]))
-            test_set[-1].y = np.float32(test_set[-1].y[:,cut_ind_test:])
+            test_set[-1].y = np.float32(test_set[-1].y[:, cut_ind_test:])
 
             if n_seconds_valid_set > 0:
-                cut_ind_valid = int(np.size(train_set[-1].y) - (n_seconds_valid_set+n_seconds_test_set)*sampling_rate) # use last nSecondsTestSet as test set
+                cut_ind_valid = int(np.size(train_set[-1].y) - (
+                            n_seconds_valid_set + n_seconds_test_set) * sampling_rate)  # use last nSecondsTestSet as test set
                 valid_set.append(deepcopy(train_set[-1]))
                 valid_set[-1].X[0] = np.array(np.float32(valid_set[-1].X[0][:, cut_ind_valid:cut_ind_test]))
-                valid_set[-1].y = np.float32(valid_set[-1].y[:,cut_ind_valid:cut_ind_test])
+                valid_set[-1].y = np.float32(valid_set[-1].y[:, cut_ind_valid:cut_ind_test])
             elif n_seconds_valid_set == 0:
                 cut_ind_valid = cut_ind_test
                 valid_set.append(None)
@@ -333,7 +336,7 @@ def run_experiment(
                 return
 
             train_set[-1].X[0] = np.array(np.float32(train_set[-1].X[0][:, :cut_ind_valid]))
-            train_set[-1].y = np.float32(train_set[-1].y[:,:cut_ind_valid])
+            train_set[-1].y = np.float32(train_set[-1].y[:, :cut_ind_valid])
 
             # Normalize targets
             # train_set_y_mean = np.mean(train_set[-1].y)
@@ -343,7 +346,7 @@ def run_experiment(
             # test_set[-1].y = (test_set[-1].y - train_set_y_mean) / train_set_y_std  # Use only training data
 
         for i_subject in range(len(subjects)):
-            
+
             subjName = subjects[i_subject]
 
             # Check if experiment has already been run. If so go to next subject
@@ -361,11 +364,14 @@ def run_experiment(
                 if lin_reg:
                     regr = LinearRegression(fit_intercept=True, normalize=False, copy_X=True, n_jobs=None)
                 elif lin_svr:
-                    regr = LinearSVR(verbose=3, random_state=20170629)#, max_iter=1000)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
+                    regr = LinearSVR(verbose=3,
+                                     random_state=20170629)  # , max_iter=1000)# epsilon=0.0, tol=0.0001, C=1.0, loss=’epsilon_insensitive’, fit_intercept=True, intercept_scaling=1.0, dual=True, verbose=0, random_state=None, max_iter=1000)
                 elif rbf_svr:
-                    regr = SVR(verbose=3, max_iter=100000)#kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
+                    regr = SVR(verbose=3,
+                               max_iter=100000)  # kernel=’rbf’, degree=3, gamma=’auto_deprecated’, coef0=0.0, tol=0.001, C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
                 elif rf_reg:
-                    regr = RandomForestRegressor(n_estimators=100, n_jobs=16, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
+                    regr = RandomForestRegressor(n_estimators=100, n_jobs=16, verbose=3,
+                                                 random_state=20170629)  # (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
 
                 # Train the model using the training sets
 
@@ -376,19 +382,20 @@ def run_experiment(
                 joblib.dump(regr, model_base_name + '_model.pkl.z')  # z to compress using zlib. Compression should be
                 # lossless https://zlib.net/
 
-
                 for i_eval_subject in range(len(subjects)):
                     # Make predictions using the training set
                     print('Testing on train data...')
                     train_set_pred = regr.predict(train_set[i_eval_subject].X[0].T)
                     print('Saving training set predictions...')
-                    joblib.dump([train_set[i_eval_subject].y.T, train_set_pred], model_base_name + '_' + subjects[i_eval_subject] + '_train_preds.plk.z')
+                    joblib.dump([train_set[i_eval_subject].y.T, train_set_pred],
+                                model_base_name + '_' + subjects[i_eval_subject] + '_train_preds.plk.z')
 
                     # Metrics
                     mse_train = mean_squared_error(train_set[i_eval_subject].y.T, train_set_pred)
                     var_score_train = r2_score(train_set[i_eval_subject].y.T, train_set_pred)
                     corrcoef_train, pval_train = pearsonr(train_set_pred, train_set[i_eval_subject].y.T[:, 0])
-                    print("Train {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name, mse_train,
+                    print("Train {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name,
+                                                                                                         mse_train,
                                                                                                          var_score_train,
                                                                                                          corrcoef_train,
                                                                                                          pval_train))
@@ -398,17 +405,19 @@ def run_experiment(
                         print('Testing on validation data...')
                         valid_set_pred = regr.predict(valid_set[i_eval_subject].X[0].T)
                         print('Saving validation set predictions...')
-                        joblib.dump([valid_set[i_eval_subject].y.T, valid_set_pred], model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
+                        joblib.dump([valid_set[i_eval_subject].y.T, valid_set_pred],
+                                    model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
 
                         # Metrics
                         mse_valid = mean_squared_error(valid_set[i_eval_subject].y.T, valid_set_pred)
                         var_score_valid = r2_score(valid_set[i_eval_subject].y.T, valid_set_pred)
                         corrcoef_valid, pval_valid = pearsonr(valid_set_pred, valid_set[i_eval_subject].y.T[:, 0])
-                        print("Validation {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name,
-                                                                                                                  mse_valid,
-                                                                                                                  var_score_valid,
-                                                                                                                  corrcoef_valid,
-                                                                                                                  pval_valid))
+                        print("Validation {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(
+                            model_name,
+                            mse_valid,
+                            var_score_valid,
+                            corrcoef_valid,
+                            pval_valid))
                     else:
                         mse_valid = np.nan
                         var_score_valid = np.nan
@@ -419,14 +428,16 @@ def run_experiment(
                     print('Testing on test data...')
                     test_set_pred = regr.predict(test_set[i_eval_subject].X[0].T)
                     print('Saving test set predictions...')
-                    joblib.dump([test_set[i_eval_subject].y.T, test_set_pred], model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
+                    joblib.dump([test_set[i_eval_subject].y.T, test_set_pred],
+                                model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
 
                     # Metrics
                     mse_test = mean_squared_error(test_set[i_eval_subject].y.T, test_set_pred)
                     var_score_test = r2_score(test_set[i_eval_subject].y.T, test_set_pred)
                     corrcoef_test, pval_test = pearsonr(test_set_pred, test_set[i_eval_subject].y.T[:, 0])
                     print(
-                        "Test {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name, mse_test,
+                        "Test {:s}: MSE {:.4f}, var_score {:.4f}, corr {:.4f}, p-value {:.4f}".format(model_name,
+                                                                                                      mse_test,
                                                                                                       var_score_test,
                                                                                                       corrcoef_test,
                                                                                                       pval_test))
@@ -434,12 +445,13 @@ def run_experiment(
                     # Save metrics
                     print('Saving results...')
                     result_df = pd.Series({'Train mse': mse_train, 'Train corr': corrcoef_train, 'Train corr p':
-                                              pval_train, 'Train explained variance': var_score_train,
-                                              'Validation mse': mse_valid, 'Validation corr': corrcoef_valid, 'Validation corr p':
-                                              pval_valid, 'Validation explained variance': var_score_valid,
-                                              'Test mse': mse_test, 'Test corr': corrcoef_test, 'Test corr p':
-                                              pval_test, 'Test explained variance': var_score_test,
-                                              }).to_frame(subjName + save_addon_text + '_' + subjects[i_eval_subject])
+                        pval_train, 'Train explained variance': var_score_train,
+                                           'Validation mse': mse_valid, 'Validation corr': corrcoef_valid,
+                                           'Validation corr p':
+                                               pval_valid, 'Validation explained variance': var_score_valid,
+                                           'Test mse': mse_test, 'Test corr': corrcoef_test, 'Test corr p':
+                                               pval_test, 'Test explained variance': var_score_test,
+                                           }).to_frame(subjName + save_addon_text + '_' + subjects[i_eval_subject])
                     result_df.to_csv(model_base_name + '_' + subjects[i_eval_subject] + '.csv', sep=',', header=True)
                     # Explained variance score: 1 is perfect prediction
 
@@ -453,7 +465,7 @@ def run_experiment(
                     plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
                     plt.title(
                         'Train {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(model_name, mse_train, corrcoef_train,
-                                                                             pval_train))
+                                                                            pval_train))
                     plt.xlabel('time (s)')
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
@@ -469,15 +481,18 @@ def run_experiment(
                         # Plot outputs
                         plt.rcParams.update({'font.size': 24})
                         plt.figure(figsize=(32, 12))
-                        t = np.arange(valid_set_pred.shape[0])/sampling_rate
+                        t = np.arange(valid_set_pred.shape[0]) / sampling_rate
                         plt.plot(t, valid_set_pred)
                         plt.plot(t, valid_set[i_eval_subject].y.T)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                        plt.title('{:g}s validation {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_valid_set, model_name, mse_valid, corrcoef_valid, pval_valid))
+                        plt.title('{:g}s validation {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_valid_set,
+                                                                                                 model_name, mse_valid,
+                                                                                                 corrcoef_valid,
+                                                                                                 pval_valid))
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
-                        plt.xlim(0,  int(np.round(valid_set_pred.shape[0]/sampling_rate)))
+                        plt.xlim(0, int(np.round(valid_set_pred.shape[0] / sampling_rate)))
                         # plt.show()
                         plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
                                     bbox_inches='tight', dpi=300)
@@ -493,8 +508,10 @@ def run_experiment(
                         plt.plot(t, test_set_pred)
                         plt.plot(t, test_set[i_eval_subject].y.T)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                        plt.title('{:g}s test {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_test_set, model_name, mse_test,
-                                                                                       corrcoef_test, pval_test))
+                        plt.title(
+                            '{:g}s test {:s}: mse = {:f}, r = {:f}, p = {:f}'.format(n_seconds_test_set, model_name,
+                                                                                     mse_test,
+                                                                                     corrcoef_test, pval_test))
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
@@ -510,8 +527,8 @@ def run_experiment(
                 torch.cuda.set_device(gpu_index)
 
                 # This will determine how many crops are processed in parallel
-                input_time_length = int(time_window_duration/1000*sampling_rate) # train_set[i_subject].X.shape[1]
-                in_chans=train_set[i_subject].X[0].shape[0]
+                input_time_length = int(time_window_duration / 1000 * sampling_rate)  # train_set[i_subject].X.shape[1]
+                in_chans = train_set[i_subject].X[0].shape[0]
 
                 if deep4:
                     # final_conv_length determines the size of the receptive field of the ConvNet
@@ -530,7 +547,8 @@ def run_experiment(
                                       final_pool_length=2, n_first_filters=48,
                                       conv_weight_init_fn=init_fn).create_network()
                 elif eeg_net_v4:
-                    model = EEGNetv4(in_chans=in_chans, n_classes=1, final_conv_length=2, input_time_length=input_time_length).create_network()
+                    model = EEGNetv4(in_chans=in_chans, n_classes=1, final_conv_length=2,
+                                     input_time_length=input_time_length).create_network()
 
                 # remove softmax
                 new_model = nn.Sequential()
@@ -539,24 +557,20 @@ def run_experiment(
                         continue
                     new_model.add_module(name, module)
 
-
                 # lets remove empty final dimension
                 def squeeze_out(x):
                     # Remove single "class" dimension
                     assert x.size()[1] == 1
                     return x[:, 0]
 
-
                 new_model.add_module('squeeze_again', Expression(squeeze_out))
                 model = new_model
-
 
                 if cuda:
                     model.cuda()
 
                 if not res_net:
                     to_dense_prediction_model(model)
-
 
                 start_param_values = deepcopy(new_model.state_dict())
 
@@ -567,12 +581,12 @@ def run_experiment(
                 out = model(test_input)
                 n_preds_per_input = out.cpu().data.numpy().shape[1]
                 log.info("predictor length = {:d} samples".format(n_preds_per_input))
-                log.info("predictor length = {:f} s".format(n_preds_per_input/sampling_rate))
+                log.info("predictor length = {:f} s".format(n_preds_per_input / sampling_rate))
 
+                iterator = CropsFromTrialsIterator(batch_size=batch_size, input_time_length=input_time_length,
+                                                   n_preds_per_input=n_preds_per_input)
 
-                iterator = CropsFromTrialsIterator(batch_size=batch_size, input_time_length=input_time_length,n_preds_per_input=n_preds_per_input)
-
-                 # %% Loss function takes predictions as they come out of the network and the targets and returns a loss
+                # %% Loss function takes predictions as they come out of the network and the targets and returns a loss
                 loss_function = F.mse_loss
 
                 # Could be used to apply some constraint on the models, then should be object with apply method that accepts a module
@@ -586,13 +600,12 @@ def run_experiment(
                 # %% Stop criterion determines when the first stop happens
                 stop_criterion = MaxEpochs(max_train_epochs)
 
-
-                 # %% re-initialize model
+                # %% re-initialize model
                 model.load_state_dict(deepcopy(start_param_values))
 
                 if adam:
                     optimizer = optim.Adam(model.parameters(), weight_decay=weight_decay,
-                                               lr=init_lr)
+                                           lr=init_lr)
                 else:
                     weight_decay = np.float32(weight_decay)
                     init_lr = np.float32(init_lr)
@@ -607,7 +620,6 @@ def run_experiment(
                     elif optimizer_name == 'adamw':
                         optimizer = AdamW(model.parameters(), weight_decay=weight_decay,
                                           lr=init_lr)
-
 
                     restarts = None
                     if scheduler_name is not None:
@@ -647,7 +659,7 @@ def run_experiment(
 
                 # %% save values: CC, pred, resp
                 exp.model_base_name = model_base_name
-                if (len(exp.epochs_df) != max_train_epochs+1):
+                if (len(exp.epochs_df) != max_train_epochs + 1):
                     print('WARNING: the epoch dataframe has too few epochs: {:d}'.format(len(exp.epochs_df)))
 
                 print('Saving epoch dataframe...')
@@ -660,9 +672,10 @@ def run_experiment(
                 # %% plot learning curves
 
                 print('Plotting & saving...')
-                f, axarr = plt.subplots(2, figsize=(15,15))
-                exp.epochs_df.loc[:,['train_loss','valid_loss','test_loss']].plot(ax=axarr[0], title='loss function',  logy=True)
-                exp.epochs_df.loc[:,['train_corr','valid_corr','test_corr']].plot(ax=axarr[1], title='correlation')
+                f, axarr = plt.subplots(2, figsize=(15, 15))
+                exp.epochs_df.loc[:, ['train_loss', 'valid_loss', 'test_loss']].plot(ax=axarr[0], title='loss function',
+                                                                                     logy=True)
+                exp.epochs_df.loc[:, ['train_corr', 'valid_corr', 'test_corr']].plot(ax=axarr[1], title='correlation')
                 plt.savefig(exp.model_base_name + '_fig_lc.png', bbox_inches='tight')
 
                 for i_eval_subject in range(len(subjects)):
@@ -688,7 +701,7 @@ def run_experiment(
                     var_score_train = r2_score(targets_per_trial, preds_per_trial)
                     print('Saving training set predictions...')
                     joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[
-                                                                                                   i_eval_subject] + '_train_preds.pkl.z')
+                        i_eval_subject] + '_train_preds.pkl.z')
 
                     # %% plot predicted rating
                     plt.rcParams.update({'font.size': 24})
@@ -717,9 +730,11 @@ def run_experiment(
                             all_targets.append(batch[1])
 
                         preds_2d = [p[:, None] for p in all_preds]
-                        preds_per_trial = compute_preds_per_trial_from_crops(preds_2d, input_time_length, dataset.X)[0][0]
+                        preds_per_trial = compute_preds_per_trial_from_crops(preds_2d, input_time_length, dataset.X)[0][
+                            0]
                         ys_2d = [y[:, None] for y in all_targets]
-                        targets_per_trial = compute_preds_per_trial_from_crops(ys_2d, input_time_length, dataset.X)[0][0]
+                        targets_per_trial = compute_preds_per_trial_from_crops(ys_2d, input_time_length, dataset.X)[0][
+                            0]
                         assert preds_per_trial.shape == targets_per_trial.shape
 
                         # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
@@ -727,7 +742,8 @@ def run_experiment(
                         mse_valid = mean_squared_error(targets_per_trial, preds_per_trial)
                         var_score_valid = r2_score(targets_per_trial, preds_per_trial)
                         print('Saving validation set predictions...')
-                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
+                        joblib.dump([targets_per_trial, preds_per_trial],
+                                    exp.model_base_name + '_' + subjects[i_eval_subject] + '_valid_preds.pkl.z')
 
                         # %% plot predicted rating
                         plt.rcParams.update({'font.size': 24})
@@ -736,7 +752,8 @@ def run_experiment(
                         plt.plot(t, preds_per_trial)
                         plt.plot(t, targets_per_trial)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                        plt.title('Validation set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_valid, corrcoef_valid, pval_valid))
+                        plt.title('Validation set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_valid, corrcoef_valid,
+                                                                                          pval_valid))
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
@@ -761,22 +778,25 @@ def run_experiment(
                             all_targets.append(batch[1])
 
                         preds_2d = [p[:, None] for p in all_preds]
-                        preds_per_trial = compute_preds_per_trial_from_crops(preds_2d, input_time_length, dataset.X)[0][0]
+                        preds_per_trial = compute_preds_per_trial_from_crops(preds_2d, input_time_length, dataset.X)[0][
+                            0]
                         ys_2d = [y[:, None] for y in all_targets]
-                        targets_per_trial = compute_preds_per_trial_from_crops(ys_2d, input_time_length, dataset.X)[0][0]
+                        targets_per_trial = compute_preds_per_trial_from_crops(ys_2d, input_time_length, dataset.X)[0][
+                            0]
                         assert preds_per_trial.shape == targets_per_trial.shape
 
-                        #corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
+                        # corrcoefs = np.corrcoef(preds_per_trial, targets_per_trial)[0, 1]
                         (corrcoef_test, pval_test) = pearsonr(targets_per_trial, preds_per_trial)
                         mse_test = mean_squared_error(targets_per_trial, preds_per_trial)
                         var_score_test = r2_score(targets_per_trial, preds_per_trial)
                         print('Saving test set predictions...')
-                        joblib.dump([targets_per_trial, preds_per_trial], exp.model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
+                        joblib.dump([targets_per_trial, preds_per_trial],
+                                    exp.model_base_name + '_' + subjects[i_eval_subject] + '_test_preds.pkl.z')
 
                         # %% plot predicted rating
                         plt.rcParams.update({'font.size': 24})
                         plt.figure(figsize=(32, 12))
-                        t = np.arange(preds_per_trial.shape[0])/sampling_rate
+                        t = np.arange(preds_per_trial.shape[0]) / sampling_rate
                         plt.plot(t, preds_per_trial)
                         plt.plot(t, targets_per_trial)
                         plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
@@ -784,8 +804,9 @@ def run_experiment(
                         plt.xlabel('time (s)')
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
-                        plt.xlim(0, int(np.round(preds_per_trial.shape[0]/sampling_rate)))
-                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png', bbox_inches='tight', dpi=300)
+                        plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
+                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png',
+                                    bbox_inches='tight', dpi=300)
                         log.info("-----------------------------------------")
                         plt.close('all')
                     else:
@@ -808,40 +829,48 @@ def run_experiment(
 
                 if calc_viz:
                     # %% visualization (Kay): Wrap Model into SelectiveSequential and set up pred_fn
-                    assert(len(list(model.children()))==len(list(model.named_children()))) # All modules gotta have names!
+                    assert (len(list(model.children())) == len(
+                        list(model.named_children())))  # All modules gotta have names!
 
-                    modules = list(model.named_children()) # Extract modules from model
-                    select_modules = ['conv_spat','conv_2','conv_3','conv_4'] # Specify intermediate outputs
+                    modules = list(model.named_children())  # Extract modules from model
+                    select_modules = ['conv_spat', 'conv_2', 'conv_3', 'conv_4']  # Specify intermediate outputs
 
-                    model_pert = SelectiveSequential(select_modules, modules) # Wrap modules
+                    model_pert = SelectiveSequential(select_modules, modules)  # Wrap modules
                     # Prediction function that is used in phase_perturbation_correlation
                     model_pert.eval();
                     pred_fn = lambda x: [layer_out.data.numpy() for
-                                         layer_out in model_pert.forward(torch.autograd.Variable(torch.from_numpy(x)).float())]
+                                         layer_out in
+                                         model_pert.forward(torch.autograd.Variable(torch.from_numpy(x)).float())]
 
                     # Gotta change pred_fn a bit for cuda case
                     if cuda:
                         model_pert.cuda()
                         pred_fn = lambda x: [layer_out.data.cpu().numpy() for
-                                             layer_out in model_pert.forward(torch.autograd.Variable(torch.from_numpy(x)).float().cuda())]
+                                             layer_out in model_pert.forward(
+                                torch.autograd.Variable(torch.from_numpy(x)).float().cuda())]
 
-                    perm_X = np.expand_dims(train_set[i_subject].X,3) # Input gotta have dimension BxCxTx1
+                    perm_X = np.expand_dims(train_set[i_subject].X, 3)  # Input gotta have dimension BxCxTx1
 
                     # %% visualization (Kay): Run phase and amplitude perturbations
                     log.info("visualization: perturbation computation ...")
-                    phase_pert_corrs = perturbation_correlation(phase_perturbation, correlate_feature_maps, pred_fn,4,perm_X,n_perturbations,batch_size=2000)
-                    amp_pert_corrs = perturbation_correlation(amp_perturbation_multiplicative, mean_diff_feature_maps, pred_fn,4,perm_X,n_perturbations,batch_size=2000)
+                    phase_pert_corrs = perturbation_correlation(phase_perturbation, correlate_feature_maps, pred_fn, 4,
+                                                                perm_X, n_perturbations, batch_size=2000)
+                    amp_pert_corrs = perturbation_correlation(amp_perturbation_multiplicative, mean_diff_feature_maps,
+                                                              pred_fn, 4, perm_X, n_perturbations, batch_size=2000)
 
                     # %% save perturbation over layers
-                    freqs = np.fft.rfftfreq(perm_X.shape[2],d=1/250.)
+                    freqs = np.fft.rfftfreq(perm_X.shape[2], d=1 / 250.)
                     for l in range(len(phase_pert_corrs)):
                         layer_cc = phase_pert_corrs[l]
-                        scipy.io.savemat(exp.model_base_name + '_phiPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
+                        scipy.io.savemat(exp.model_base_name + '_phiPrtCC' + '_layer{:d}'.format(l) + '.mat',
+                                         {'layer_cc': layer_cc})
                         layer_cc = amp_pert_corrs[l]
-                        scipy.io.savemat(exp.model_base_name + '_ampPrtCC' + '_layer{:d}'.format(l) + '.mat', {'layer_cc':layer_cc})
+                        scipy.io.savemat(exp.model_base_name + '_ampPrtCC' + '_layer{:d}'.format(l) + '.mat',
+                                         {'layer_cc': layer_cc})
 
                 print('Deleting model and experiment...')
                 del exp, model
+
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
@@ -856,8 +885,6 @@ def main():
     # write_kwargs_and_epochs_dfs(kwargs, exp)
     # make_final_predictions(kwargs, exp)
     # save_model(kwargs, exp)
-
-
 
 
 if __name__ == '__main__':

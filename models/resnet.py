@@ -1,10 +1,10 @@
+import numpy as np
 import torch as th
 from braindecode.torch_ext.modules import Expression
 from braindecode.torch_ext.util import np_to_var
 from torch import nn
 from torch.nn import init
 from torch.nn.functional import elu
-import numpy as np
 
 
 class EEGResNet(object):
