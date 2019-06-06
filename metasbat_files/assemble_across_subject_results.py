@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import glob
+import re
 import matplotlib.pyplot as plt
+import seaborn as sns
 from scipy import stats
 
 configurations_file = '/mnt/meta-cluster/home/fiederer/nicebot/metasbat_files/configs_no_valid.csv'
@@ -20,11 +22,16 @@ configurations['corr_test'] = np.tile(np.zeros(9) * np.nan, (len(configurations)
 configurations['corr_p_train'] = np.tile(np.zeros(9) * np.nan, (len(configurations),1)).tolist()
 configurations['corr_p_valid'] = np.tile(np.zeros(9) * np.nan, (len(configurations),1)).tolist()
 configurations['corr_p_test'] = np.tile(np.zeros(9) * np.nan, (len(configurations),1)).tolist()
+reapplication_error = []
+original_mse = []
+is_model = []
+is_config = []
+corr_coef_error = []
 
 for i_config in configurations.index:
     result_folder = configurations.loc[i_config, 'result_folder']
     unique_id = configurations.loc[i_config, 'unique_id']
-    matching_results = np.sort(glob.glob('/mnt/meta-cluster/' + result_folder + '/*' + unique_id + '*.csv'))
+    matching_results = np.sort(glob.glob('/mnt/meta-cluster' + result_folder + '/*' + unique_id + '*Exp.csv'))
     # TODO: Check that we get only one result per subject, but not sure what to do if not. Check that results are
     #  identical?
 
@@ -32,6 +39,90 @@ for i_config in configurations.index:
         configurations.loc[i_config, 'config_has_run'] = True
         i_subject = -1
         for subject in matching_results:
+            # Check if this subject was applied on himself. If yes make sure that the results are identical to
+            # the original ones
+            word_list = re.split('[_/.]', subject)  # Split path to .csv file into single words delimited by _ /
+            # and .
+            if word_list.count(word_list[-2]) == 2 and bool(re.match('.*Net.*', word_list[-4])):  # If the second to
+                # last word (either subject model was applied to or unique ID of the experiment) is present twice
+                # then the model was trained on the same subject
+                df_original = pd.read_csv(subject.replace('_' + word_list[-2], '_epochs'))  # load result of original
+                # predictions
+                df_same = pd.read_csv(subject)# load result of across subjects predictions on same subject
+                if len(df_original) == configurations.loc[i_config, 'max_epochs']+1:  # then these are the results
+                    # stored in an epochs dataframe
+                    tmp = df_original.tail(1)['test_loss'].values[0]
+                elif len(df_original) == 12:
+                    assert df_original.values[8, 0] == 'Test mse', 'Value at hardcoded index is not Test mse!'
+                    tmp = df_original.values[8, 1]
+                else:
+                    print('Unexpected situation! Please check the code!')
+                    exit()
+
+                assert df_same.values[8, 0] == 'Test mse', 'Value at hardcoded index is not Test mse!'
+                if tmp == df_same.values[8, 1]:  # Check if test mse is equal
+                    continue  # if equal skip as we already have written the results to the dataframe
+                else:
+                    is_config.append(i_config)
+                    original_mse.append(tmp)
+                    reapplication_error.append(tmp - df_same.values[8, 1])
+                    corr_coef_error.append(df_original.tail(1)['test_corr'].values[0] - df_same.values[9, 1])
+
+                    if word_list[12] == 'EEGNetv4':
+                        is_model.append(0)
+                    elif word_list[12] == 'Deep4Net':
+                        is_model.append(1)
+                    elif word_list[12] == 'ResNet':
+                        is_model.append(2)
+                    elif word_list[12] == 'lin':
+                        if word_list[13] == 'reg':
+                            is_model.append(3)
+                        elif word_list[13] == 'svr':
+                            is_model.append(4)
+                        else:
+                            print(word_list[13] + 'Unexpected situation! Please check the code!')
+                            exit()# if not equal throw error
+                    elif word_list[12] == 'rbf':
+                        is_model.append(5)
+                    elif word_list[12] == 'rf':
+                        is_model.append(6)
+                    else:
+                        print(word_list[12] + 'Unexpected situation! Please check the code!')
+                        exit()# if not equal throw error
+                    # if len(df_original) == 12:
+                    #     is_model.append(False)
+                    # else:
+                    #     is_model.append(True)
+                    continue
+                    # print('Unexpected situation! Please check the code!')
+                    # exit()# if not equal throw error
+
+            elif word_list.count(word_list[-2]) > 2:
+                print('Unexpected situation! Please check the code!')
+                exit()
+# #%%
+# plt.figure
+# plt.yscale("log"),plt.xscale("log")
+# plt.scatter(original_mse, np.abs(reapplication_error)), plt.xlabel('original mse'), plt.ylabel('absolute '
+#                                                                                        'difference to '
+#                                                                                        'reapplied')
+# plt.show()
+#
+# #%%
+# plt.figure
+# plt.yscale("log"),plt.xscale("log")
+# plt.scatter(original_mse, np.abs(corr_coef_error)), plt.xlabel('original corr coef'), plt.ylabel('absolute '
+#                                                                                        'difference to '
+#                                                                                        'reapplied')
+# plt.show()
+# #%%
+# plt.figure
+# # plt.yscale("log"),plt.xscale("log")
+# plt.scatter(original_mse, [a+b for a, b in zip(original_mse, reapplication_error)])
+# plt.xlabel('original mse'),
+# plt.ylabel('new mse')
+# plt.show()
+# #%%
             i_subject += 1
             df = pd.read_csv(subject)
             # if configurations.loc[i_config, 'model_name'] in ['deep4', 'eegnet', 'resnet']:
@@ -129,7 +220,8 @@ for i_config in configurations.index:
 #%% Plot fancy results
 # configurations_file = '/mnt/meta-cluster/home/fiederer/nicebot/metasbat_files/configs_all_models_with_results.csv'
 # configurations = pd.read_csv(configurations_file)  # Load existing configs
-
+# TODO: Visualize the across subject results as second ring using the same fill colors but different edge colors. That
+#  way we have the direct comparison of within and across results
 f = plt.figure(figsize=[15, 10])
 # plt.autoscale(False)
 x_positions = np.array([2, 4, 1, 3, 5, 2, 4])
@@ -247,307 +339,86 @@ plt.text(0.5, 0.95, 'Data split: ' + data_split + ' set', horizontalalignment='c
 # plt.figlegend(['lin_reg', 'lin_svr', 'eegNet', 'deep4', 'resNet', 'rbf_svr', 'rf_reg'], loc='center right')#, bbox_to_anchor=(1, 0.5))
 plt.show()
 
-#%% Some metrics
-i_subject = 0
-model_name = 'lin_svr'
-# electrodes =
-df_mse = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*C*'")][
-    'mse_test']
-df_corr = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*C*'")][
-    'corr_test']
-
-print(np.median([b[i_subject]/a[i_subject] for a, b in zip(df_mse, df_corr)]))
-
-df_mse = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*z'")][
-    'mse_test']
-df_corr = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*z'")][
-    'corr_test']
-print(np.median([b[i_subject]/a[i_subject] for a, b in zip(df_mse, df_corr)]))
-
-df_mse = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*'")][
-    'mse_test']
-df_corr = configurations[(configurations['model_name'] == model_name) & (configurations['electrodes'] == "'*'")][
-    'corr_test']
-print(np.median([b[i_subject]/a[i_subject] for a, b in zip(df_mse, df_corr)]))
-
 #%% Overall best performing method
-
-data_split_values = ['train', 'valid', 'test']
+# data_split_values = ['train', 'test']
+data_split_values = ['test']
 model_values = configurations['model_name'].unique()
 assert(all(model_values == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']))
 
 f = plt.figure(figsize=[15, 10])
-for i_split in range(len(data_split_values)):
-    ax = plt.subplot(np.size(model_values) + 1, np.size(data_split_values), i_split+1)
-    plt.text(0.5, 0.5, 'All data types: ' + data_split_values[i_split], size=16, horizontalalignment='center',
-             verticalalignment='center',
-             transform=ax.transAxes)
-    ax.axis('off')
-
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 1)
-# ax.text(data_split_values[0])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 2)
-# ax.set_title(data_split_values[1])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 3)
-# ax.set_title(data_split_values[2])
-
-subplot_index = 4
-for model_name in model_values:
-    for data_split in data_split_values:
-        ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), subplot_index)
-        subplot_index += 1
+# plt.axes()
+# f.axes[0].set_xscale("log", nonposx='clip')
+# f.axes[0].set_xscale("log")
+metric_df = pd.DataFrame()
+for data_split in data_split_values:
+    # subplot_index += 1
+    for model_name in model_values:
         df_mse = configurations[(configurations['model_name'] == model_name)]['mse_' + data_split]
         df_corr = configurations[(configurations['model_name'] == model_name)]['corr_' + data_split]
         # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
         #             np.array([i if i is not None else np.nan for i in a])
         #             for a, b in zip(df_mse, df_corr)])
-        x = np.array([i if i is not None else np.nan for i in df_mse])
-        # x = np.array([i if i is not None else np.nan for i in df_corr])
-
-        ax.hist(x[~np.isnan(x)], bins='auto')
-        ax.axis('tight')
-        x_median = np.nanmedian(x.flatten())
-        ax.axvline(x_median, color='r')
-        ax.text(x_median, 0, '{:.3f}'.format(x_median), color='k')
-        ax.set_title(model_name)
-# for i_split in range(len(data_split_values)):
-#     plt.text(0.25*(i_split+1), 0.95, data_split_values[i_split], horizontalalignment='center',
-#              verticalalignment='center',
-#          transform=f.transFigure)
-
-f.tight_layout()
-plt.show()
-
-# User test to determine if anything significantly different
-stats.wilcoxon()
-
-#%% Best performing method for each data type
-
-data_values = configurations['data'].unique()
-data_split_values = ['train', 'valid', 'test']
-model_values = configurations['model_name'].unique()
-assert(all(model_values == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']))
-
-for data in data_values:
-    df = configurations[configurations['data'] == data]
-
-    f = plt.figure(figsize=[15, 10])
-    for i_split in range(len(data_split_values)):
-        ax = plt.subplot(np.size(model_values) + 1, np.size(data_split_values), i_split+1)
-        plt.text(0.5, 0.5, data + ': ' + data_split_values[i_split], size=16, horizontalalignment='center',
-                 verticalalignment='center',
-                 transform=ax.transAxes)
-        ax.axis('off')
-
-    # ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 1)
-    # ax.text(data_split_values[0])
-    # ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 2)
-    # ax.set_title(data_split_values[1])
-    # ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 3)
-    # ax.set_title(data_split_values[2])
-
-    subplot_index = 4
-    for model_name in model_values:
-        for data_split in data_split_values:
-            ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), subplot_index)
-            subplot_index += 1
-            df_mse = df[(df['model_name'] == model_name)]['mse_' + data_split]
-            df_corr = df[(df['model_name'] == model_name)]['corr_' + data_split]
-            # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
-            #             np.array([i if i is not None else np.nan for i in a])
-            #             for a, b in zip(df_mse, df_corr)])
-            x = np.abs([np.array([i if i is not None else np.nan for i in df_mse])])
-            # x = np.abs([np.array([i if i is not None else np.nan for i in df_corr])])
-
-            ax.hist(x[~np.isnan(x)].flatten(), bins='auto')
-            ax.axis('tight')
-            x_median = np.nanmedian(x.flatten())
-            ax.axvline(x_median, color='r')
-            ax.text(x_median, 0, '{:.3f}'.format(x_median), color='k')
-            ax.set_title(model_name)
-    # for i_split in range(len(data_split_values)):
-    #     plt.text(0.25*(i_split+1), 0.95, data_split_values[i_split], horizontalalignment='center',
-    #              verticalalignment='center',
-    #          transform=f.transFigure)
-
-    f.tight_layout()
-    plt.show()
-
-#%% Overall best electrode set
-data_split_values = ['train', 'valid', 'test']
-electrode_sets = configurations['electrodes'].unique()
-assert(all(electrode_sets == ["'*'", "'*z'", "'*C*'"]))
-
-f = plt.figure(figsize=[15, 10])
-for i_split in range(len(data_split_values)):
-    ax = plt.subplot(np.size(electrode_sets) + 1, np.size(data_split_values), i_split+1)
-    plt.text(0.5, 0.5, 'All data types: ' + data_split_values[i_split], size=16, horizontalalignment='center',
-             verticalalignment='center',
-             transform=ax.transAxes)
-    ax.axis('off')
-
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 1)
-# ax.text(data_split_values[0])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 2)
-# ax.set_title(data_split_values[1])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 3)
-# ax.set_title(data_split_values[2])
-
-subplot_index = 4
-for electrode_set_name in electrode_sets:
-    for data_split in data_split_values:
-        ax = plt.subplot(np.size(electrode_sets)+1, np.size(data_split_values), subplot_index)
-        subplot_index += 1
-        df_mse = configurations[(configurations['electrodes'] == electrode_set_name)]['mse_' + data_split]
-        df_corr = configurations[(configurations['electrodes'] == electrode_set_name)]['corr_' + data_split]
-        # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
-        #             np.array([i if i is not None else np.nan for i in a])
-        #             for a, b in zip(df_mse, df_corr)])
-        x = np.array([i if i is not None else np.nan for i in df_mse])
-        # x = np.array([i if i is not None else np.nan for i in df_corr])
-
-        ax.hist(x[~np.isnan(x)], bins='auto')
-        ax.axis('tight')
-        x_median = np.nanmedian(x.flatten())
-        ax.axvline(x_median, color='r')
-        ax.text(x_median, 0, '{:.3f}'.format(x_median), color='k')
-        ax.set_title(electrode_set_name)
-# for i_split in range(len(data_split_values)):
-#     plt.text(0.25*(i_split+1), 0.95, data_split_values[i_split], horizontalalignment='center',
-#              verticalalignment='center',
-#          transform=f.transFigure)
-
-f.tight_layout()
-plt.show()
-
-
-#%% Overall best frequency band
-data_split_values = ['train', 'valid', 'test']
-bandpass_sets = configurations['band_pass'].unique()
-# assert(all(bandpass_sets == ["'*'", "'*z'", "'*C*'"]))
-
-f = plt.figure(figsize=[15, 10])
-for i_split in range(len(data_split_values)):
-    ax = plt.subplot(np.size(bandpass_sets) + 1, np.size(data_split_values), i_split+1)
-    plt.text(0.5, 0.5, 'All data types: ' + data_split_values[i_split], size=16, horizontalalignment='center',
-             verticalalignment='center',
-             transform=ax.transAxes)
-    ax.axis('off')
-
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 1)
-# ax.text(data_split_values[0])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 2)
-# ax.set_title(data_split_values[1])
-# ax = plt.subplot(np.size(model_values)+1, np.size(data_split_values), 3)
-# ax.set_title(data_split_values[2])
-
-subplot_index = 4
-for bandpass in bandpass_sets:
-    for data_split in data_split_values:
-        ax = plt.subplot(np.size(bandpass_sets)+1, np.size(data_split_values), subplot_index)
-        subplot_index += 1
-        df_mse = configurations[(configurations['band_pass'] == bandpass)]['mse_' + data_split]
-        df_corr = configurations[(configurations['band_pass'] == bandpass)]['corr_' + data_split]
-        # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
-        #             np.array([i if i is not None else np.nan for i in a])
-        #             for a, b in zip(df_mse, df_corr)])
-        x = np.array([i if i is not None else np.nan for i in df_mse])
-        # x = np.array([i if i is not None else np.nan for i in df_corr])
-
-        ax.hist(x[~np.isnan(x)], bins='auto')
-        ax.axis('tight')
-        x_median = np.nanmedian(x.flatten())
-        ax.axvline(x_median, color='r')
-        ax.text(x_median, 0, '{:.3f}'.format(x_median), color='k')
-        ax.set_title(bandpass)
-# for i_split in range(len(data_split_values)):
-#     plt.text(0.25*(i_split+1), 0.95, data_split_values[i_split], horizontalalignment='center',
-#              verticalalignment='center',
-#          transform=f.transFigure)
-
-f.tight_layout()
-plt.show()
-
-#%% Circle plot in one axes
-
-f = plt.figure()
-x_positions = np.array([7, 19, 1, 13, 25, 7, 19])
-y_positions = np.array([1, 1, 1.5, 1.5, 1.5, 2, 2])
-subplot_index = 1
-x_shift = 18
-y_shift = 11*4
-for i_no_eeg_data in np.arange(2):
-    for i_subject in np.arange(3):
-        # plt.subplot(5, 3, subplot_index)
-        plt.scatter(x_positions+x_shift, y_positions+y_shift, s=np.random.rand(7) * 10,
-                    c=('b', 'g', 'r', 'c', 'm', 'y', 'k'))
-        x_shift += 6*21
-        # subplot_index += 1
-    x_shift = 18
-    y_shift -= 2
-
-
-x_shift = 0
-y_shift = 10*4
-for i_eeg_data in np.arange(3):
-    for i_subject in np.arange(3):
-        # plt.subplot(5, 3,subplot_index)
-        for i_bandpass in np.arange(7):
-            for i_electrode in np.arange(3):
-                plt.scatter(x_positions+x_shift, y_positions+y_shift, s=np.random.rand(7)*10,
-                            c=('b', 'g', 'r', 'c', 'm', 'y', 'k'))
-                y_shift -= 2
-            x_shift += 50
-            y_shift = 10*4
-        # subplot_index += 1
-
-plt.show()
-
-
-
-
-# for i_config in configurations.keys():
-#     result_folder = configurations[i_config]['result_folder']
-#     unique_id = configurations[i_config]['unique_id']
-#     matching_results = np.sort(glob.glob(result_folder + '/*' + unique_id[:7] + '.csv'))
-#     # Check that we get only one result per subject, but not sure what to do if not. Check that results are identical?
+        x = np.array([np.sqrt(i) if i is not None else np.nan for i in df_mse])
+        y = np.array([1-np.abs(i) if i is not None else np.nan for i in df_corr])
+#         x = x[~np.isnan(x)]
+#         y = y[~np.isnan(y)]
+#         if any(x):
+#             metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+#                                                        'data_split': data_split,
+#                                                        'metric_value': x,
+#                                                        'metric_name': 'mse'}))
+#             metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+#                                                        'data_split': data_split,
+#                                                        'metric_value': y,
+#                                                        'metric_name': 'corr'}))
+# # Plot the orbital period with horizontal boxes
+# sns.boxplot(x='metric_value', y='model', hue='metric_name', data=metric_df, whis="range", palette="vlag")
 #
-#     if any(matching_results):
-#         configurations[i_config]['config_has_run'] = True
-#         configurations[i_config]['mse_train'] = [None, None, None]
-#         configurations[i_config]['mse_valid'] = [None, None, None]
-#         configurations[i_config]['mse_test'] = [None, None, None]
-#         configurations[i_config]['corr_train'] = [None, None, None]
-#         configurations[i_config]['corr_valid'] = [None, None, None]
-#         configurations[i_config]['corr_test'] = [None, None, None]
-#         configurations[i_config]['corr_p_train'] = [None, None, None]
-#         configurations[i_config]['corr_p_valid'] = [None, None, None]
-#         configurations[i_config]['corr_p_test'] = [None, None, None]
-#         i_subject = -1
-#         for subject in matching_results:
-#             i_subject += 1
-#             df = pd.read_csv(subject)#, names=['epoch',
-#                                              # 'train_loss','valid_loss','test_loss',
-#                                              # 'train_corr','valid_corr','test_corr', 'runtime'])
-#             configurations[i_config]['mse_train'][i_subject] = df.tail(1).values[0, 1]
-#             configurations[i_config]['mse_valid'][i_subject] = df.tail(1).values[0, 2]
-#             configurations[i_config]['mse_test'][i_subject] = df.tail(1).values[0, 3]
-#             configurations[i_config]['corr_train'][i_subject] = df.tail(1).values[0, 4]
-#             configurations[i_config]['corr_valid'][i_subject] = df.tail(1).values[0, 5]
-#             configurations[i_config]['corr_test'][i_subject] = df.tail(1).values[0, 6]
-#             # configurations[i_config]['corr_p_train'][i_subject] = df.tail(1).values[0, None]
-#             # configurations[i_config]['corr_p_valid'][i_subject] = df.tail(1).values[0, None]
-#             # configurations[i_config]['corr_p_test'][i_subject] = df.tail(1).values[0, None]
-#     else:
-#         configurations[i_config]['config_has_run'] = False
-#         configurations[i_config]['mse_train'] = [None, None, None]
-#         configurations[i_config]['mse_valid'] = [None, None, None]
-#         configurations[i_config]['mse_test'] = [None, None, None]
-#         configurations[i_config]['corr_train'] = [None, None, None]
-#         configurations[i_config]['corr_valid'] = [None, None, None]
-#         configurations[i_config]['corr_test'] = [None, None, None]
-#         configurations[i_config]['corr_p_train'] = [None, None, None]
-#         configurations[i_config]['corr_p_valid'] = [None, None, None]
-#         configurations[i_config]['corr_p_test'] = [None, None, None]
+# # Add in points to show each observation
+# # sns.swarmplot(x='mse', y='model', hue='data_split', data=metric_df, size=2, color=".3", linewidth=0)
+# sns.stripplot(x='metric_value', y='model', hue='metric_name', data=metric_df, dodge=True, jitter=True, alpha=.25, zorder=1)
+
+        x = x[~np.isnan(x)]
+        y = y[~np.isnan(y)]
+        if any(x):
+            metric_df = metric_df.append(pd.DataFrame({'model': model_name, 'data_split': data_split, 'metric_value':
+                np.concatenate((x, y)), 'metric_name': np.concatenate((np.repeat('rmse', len(x)), np.repeat('1-abs('
+                                                                                                            'corr)',
+                                                                                                           len(y))))}))
+# Plot the orbital period with horizontal boxes
+sns.violinplot(x='metric_value', y='model', hue='metric_name', data=metric_df, palette="colorblind",
+               color='1', split=True, inner='quartiles', scale='area', scale_hue=True, cut=2, bw=0.15)
+# sns.boxplot(x='metric_value', y='model', hue='metric_name', data=metric_df, whis="range", width=0.1)
+
+# Add in points to show each observation
+# sns.swarmplot(x='metric_value', y='model', hue='metric_name', data=metric_df, size=2, color=".3", linewidth=0,
+#               dodge=True)
+sns.stripplot(x='metric_value', y='model', hue='metric_name', data=metric_df, dodge=True, jitter=True, alpha=.25,
+              zorder=1, palette="colorblind", color='1', edgecolor='black', linewidth=1)
+# colors = sns.color_palette('vlag',n_colors=7)
+# # colors = sp.repeat(colors,2,axis=0)
 #
-# configurations.T.to_csv(configurations_file)
+# for artist, collection, color in zip(f.axes[0].artists, f.axes[0].collections, colors):
+#     artist.set_facecolor(color)
+#     collection.set_facecolor(color)
+
+
+# Tweak the visual presentation
+# f.axes[0].get_xaxis().set_minor_locator(mpl.ticker.AutoMinorLocator())
+# f.axes[0].get_xaxis().set_major_locator(mpl.ticker.MultipleLocator(0.1))
+# f.axes[0].get_xaxis().set_major_locator(mpl.ticker.LogLocator())
+# ax.set_xticks(np.arange(0,8)-0.5, minor=True)
+# f.axes[0].xaxis.grid(b=True, which='minor', linewidth=0.5)
+# f.axes[0].xaxis.grid(b=True, which='major', linewidth=1)
+f.axes[0].set_axisbelow(True)
+f.axes[0].set(ylabel="")
+# sns.despine(trim=True, left=True)
+xlims = plt.xlim()
+plt.xlim(0.01, xlims[1])
+
+plt.title('All models, all data')
+# f.tight_layout()
+plt.show()
+
+# # User test to determine if anything significantly different
+# stats.wilcoxon()
