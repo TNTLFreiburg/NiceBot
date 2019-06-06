@@ -684,7 +684,7 @@ def run_experiment(
         # model_file_list = np.sort(glob.glob(result_folder + '/*' + current_subject + '*_model*.pkl*'))
 
         # Get list of subjects to apply models to
-        other_subjects = [b for b, c in zip(subjects, [a != current_subject for a in subjects]) if c]
+        other_subjects = subjects  # [b for b, c in zip(subjects, [a != current_subject for a in subjects]) if c]
 
         # Get the data type model was trained on
         only_robot_data = False
@@ -730,7 +730,7 @@ def run_experiment(
             subject_base_name = model_base_name + '_' + apply_to_subject
             result_files = glob.glob(subject_base_name + '.csv')
             if result_files:
-                print(result_files + ' has already been run. Trying next subject.')
+                print(result_files[0] + ' has already been run. Trying next subject.')
                 continue
 
             # Get the data of new subject
@@ -776,15 +776,18 @@ def run_experiment(
                 print('Keeping only EEG channels matching patter {:s}'.format(electrodes))
                 cnt.pick_channels(fnmatch.filter(cnt.ch_names, electrodes) + sensor_names_aux + sensor_names_robot)
                 print('Band-passing data from {:s} to {:s} Hz'.format(str(band_pass[0]), str(band_pass[1])))
-                try:
+                if electrodes == '*':
                     cnt.filter(band_pass[0], band_pass[1], picks=range(32)) # This is somewhat dangerous but the first
                 # 32 channels should always be EEG channels in the selected data configs. Unfortunately it does not look
                 # like the types of the channels have been set properly to allow selecting using picks='eeg'
-                except:
-                    try:
+                elif electrodes == '*C*':
                         cnt.filter(band_pass[0], band_pass[1], picks=range(13))
-                    except:
+                elif electrodes == '*z':
                         cnt.filter(band_pass[0], band_pass[1], picks=range(8))
+                else:
+                    print('Unsupported electrode selection {:s}. Electrode selection can be * or *C* or *z'.format(
+                        electrodes))
+                    return
 
             # mne apply will apply the function to the data (a 2d-numpy-array)
             # have to transpose data back and forth, since
@@ -1087,7 +1090,7 @@ def run_experiment(
                     plt.plot(t, preds_per_trial)
                     plt.plot(t, targets_per_trial)
                     plt.legend(('Predicted', 'Actual'), fontsize=24, loc='best')
-                    plt.title('Test set: mse = {:f}, r = {:f}, p = {:f}'.format(mse, corrcoefs, pval))
+                    plt.title('Test set: mse = {:f}, r = {:f}, p = {:f}'.format(mse_test, corrcoef_test, pval_test))
                     plt.xlabel('time (s)')
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
