@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 
 # TODO: use .txt file instead of .csv file?
@@ -70,8 +71,10 @@ def main():
             # batch_submit = "sbatch -p {queue} -c 1 --gres=gpu:0 {script_name}"
         elif any([model_name == a for a in ['eegnet', 'deep4', 'resnet']]):
             # queue = "meta_gpu-black"
-            queue = "ml_gpu-rtx2080"
+            # queue = "ml_gpu-rtx2080"
             # queue = "meta_gpu-ti"
+            # queue = "meta_gpu-x"
+            queue = ['meta_gpu-black', 'meta_gpu-x', 'meta_gpu-ti', 'ml_gpu-rtx2080'][np.random.randint(1, 3)]  # 0, 4
             batch_submit = "sbatch -p {queue} -c 2 --gres=gpu:1 {script_name}"
         else:
             os.warnin('Cannot define queue for model {:s}'.format(model_name))
