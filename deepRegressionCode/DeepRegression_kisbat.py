@@ -1,9 +1,9 @@
 import logging
 import sys
 
-from experiments.monitor import CorrelationMonitor1d
+from experiments.monitors import CorrelationMonitor1d
 from models.resnet import EEGResNet
-from visualizations.perturbation import SelectiveSequential, phase_perturbation, amp_perturbation_multiplicative, \
+from visualizations.perturbations import SelectiveSequential, phase_perturbation, amp_perturbation_multiplicative, \
     correlate_feature_maps, mean_diff_feature_maps, perturbation_correlation
 
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
