@@ -47,7 +47,7 @@ from braindecode.datautil.trial_segment import create_signal_target_from_raw_mne
 from braindecode.torch_ext.constraints import MaxNormDefaultConstraint
 
 import matplotlib as mpl
-mpl.rcParams['agg.path.chunksize'] = 10000  # Fix to overflowError in draw_path
+mpl.rcParams['agg.path.chunksize'] = 100000  # Fix to overflowError in draw_path
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from braindecode.visualization.perturbation import compute_amplitude_prediction_correlations
@@ -926,6 +926,7 @@ def run_experiment(
                     regr = RandomForestRegressor(n_estimators=100, n_jobs=16, verbose=3, random_state=20170629)# (n_estimators=’warn’, criterion=’mse’, max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features=’auto’, max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False)
 
                 # Train the model using the training sets
+
                 print('Training traditional regression model...')
                 regr.fit(train_set[i_subject].X[0].T, train_set[i_subject].y.T.squeeze())
 
@@ -1018,6 +1019,7 @@ def run_experiment(
                     # plt.show()
                     plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.png',
                                 bbox_inches='tight', dpi=300)
+                    plt.close('all')
 
                     if n_seconds_valid_set > 0:
                         # Explained variance score: 1 is perfect prediction
@@ -1037,6 +1039,7 @@ def run_experiment(
                         # plt.show()
                         plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
                                     bbox_inches='tight', dpi=300)
+                        plt.close('all')
 
                     if n_seconds_test_set > 0:
                         # Explained variance score: 1 is perfect prediction
@@ -1057,6 +1060,7 @@ def run_experiment(
                         # plt.show()
                         plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png',
                                     bbox_inches='tight', dpi=300)
+                        plt.close('all')
                     # ADD  DISTANCE AND SPEED TO BBCI FILE!!!
 
             elif model_name in ['deep4', 'resnet', 'eegnet']:
@@ -1258,6 +1262,7 @@ def run_experiment(
                     plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
                     plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.png',
                                 bbox_inches='tight', dpi=300)
+                    plt.close('all')
 
                     # %% evaluation on validation set
                     if n_seconds_valid_set > 0:
@@ -1296,6 +1301,7 @@ def run_experiment(
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
                         plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
                                     bbox_inches='tight', dpi=300)
+                        plt.close('all')
                     else:
                         mse_valid = np.nan
                         var_score_valid = np.nan
@@ -1339,13 +1345,12 @@ def run_experiment(
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0]/sampling_rate)))
                         plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png', bbox_inches='tight', dpi=300)
                         log.info("-----------------------------------------")
+                        plt.close('all')
                     else:
                         mse_test = np.nan
                         var_score_test = np.nan
                         corrcoef_test = np.nan
                         pval_test = np.nan
-
-                    plt.close('all')
 
                     # Save metrics
                     print('Saving results...')

@@ -73,7 +73,7 @@ import shortuuid
 #
 # configs.to_csv('/home/fiederer/nicebot/metasbat_files/configs.csv')
 
-# To add new configurations to an existing configuration file without overwritting identical
+# To add new configurations to an existing configuration file without overwriting identical
 # existing configurations (and their uuid) use this section.
 existing_configs = pd.DataFrame.from_csv('/home/fiederer/nicebot/metasbat_files/configs.csv') # Load existing configs
 
