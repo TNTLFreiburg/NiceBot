@@ -1,6 +1,6 @@
 %% Main script for the analysis of the experiments for the "Be Nice, Bot" paper.
 %
-% dependencies:
+% dependencies (all included in repository):
 %   Modi1987/KST-Kuka-Sunrise-Toolbox
 %       (https://github.com/Modi1987/KST-Kuka-Sunrise-Toolbox)
 %   V-REP
@@ -23,9 +23,10 @@ addpath('analysisCode')
 % path to kuka sunrise toolbox
 addpath(fullfile('reconstruction', 'Modi1987-KST-Kuka-Sunrise-Toolbox-7b72637', 'realTimeControl_iiwa_From_Vrep'));
 
-for user_experience = ['no', 'moderate', 'substantial'] % Comment this and the last line of the file if you are running in cell mode
+for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the last line of the file if you are running in cell mode
     % First, load data file of respective user, e.g.:
     % user_experience = 'moderate'; % 'no', 'substantial' % Comment this line if you are running in loop mode
+    user_experience = user_experience{:};
     load(fullfile('data', ['allFiles_' user_experience 'Exp.mat']));
     
     %then, run the respective sections within the script individually
@@ -222,22 +223,24 @@ for user_experience = ['no', 'moderate', 'substantial'] % Comment this and the l
     set(gcf,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
     
     %% Set viewing angle and save image
+    saveas(gcf,fullfile('figures',  [user_experience, '_view_default']),'fig')
+    
     az = -80.8000; el =  5.2000; % view from diagonal behind user
     view(az,el);
     %
-    print(gcf,['figures\' user_experience '_view_diagonal_behind'],'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_diagonal_behind']),'-dpdf','-r1200')
     
     az = -180; el =  0;  % view from left side of user
     view(az,el);
-    print(gcf,['figures\' user_experience '_view_left'],'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_left']),'-dpdf','-r1200')
     
     az = -90; el =  0.0000;  % view from straight behind side of user
     view(az,el);
-    print(gcf,['figures\' user_experience '_view_straight_behind'],'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_straight_behind']),'-dpdf','-r1200')
     
     az = -90; el =  90;  % topview
     view(az,el);
-    print(gcf,['figures\' user_experience '_view_top'],'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_top']),'-dpdf','-r1200')
     clf
     %[az,el] = view % get current viewing angle
     
@@ -352,12 +355,15 @@ for user_experience = ['no', 'moderate', 'substantial'] % Comment this and the l
     set(gca,'xtick', [1,nResample], 'xticklabel', {'start', 'end'});
     xlabel('normalized experiment time');
     
-    set(gcf,'PaperPositionMode', 'Auto');
+    set(gcf,'Units','Inches');
+    pos = get(gcf,'Position');
+    set(gcf,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
     
     title([user_experience, ' robot experience'])
     
     %% save fig
-    print(gcf,['figures\score_development_', user_experience, '_exp'],'-dpdf','-r300');
+    saveas(gcf, fullfile('figures', ['score_development_', user_experience, '_exp']), 'fig') 
+    print(gcf, fullfile('figures', ['score_development_', user_experience, '_exp']),'-dpdf','-r300');
     
     %% convert to BBCI format
     Settings.convertForConvNet = 1;
@@ -398,7 +404,7 @@ for user_experience = ['no', 'moderate', 'substantial'] % Comment this and the l
             score_resample(iScore*16-15:iScore*16) = score(iScore);
         end
         
-        save([savePath '\' H.PatientSession '_score.mat'], 'score_resample');
+%         save([savePath '\' H.PatientSession '_score.mat'], 'score_resample'); % Uncomment this line if you want to overwrite the data used for the regression
         
     end
 end % Comment this line if you are running in cell mode
