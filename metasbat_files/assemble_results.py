@@ -2,15 +2,23 @@
 import glob
 import re
 
+import joblib
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy as sp
 import seaborn as sns
+from matplotlib.colors import LinearSegmentedColormap
+from scipy import stats
+from sklearn.metrics import mean_squared_error, r2_score
 
+import utils.svg_stack as ss
 from utils.df_utils import initialize_empty_columns_at_index, prefill_columns_configuration_at_index, \
-    fill_results_in_configurations_at_index
-from visualizations.plots import split_combi_plot, add_significance_bars, plot_performance_matrix
+    fill_results_in_configurations_at_index, compute_performance_matrix
+from utils.statistics import fdr_corrected_pvals
+from visualizations.plots import split_combi_plot, add_significance_bars_above, add_significance_bars_below, \
+    plot_diff_matrix
 
 mpl.rcParams['figure.dpi'] = 300
 
@@ -18,6 +26,22 @@ mpl.rcParams['figure.dpi'] = 300
 configurations_file = '/mnt/meta-cluster/home/fiederer/nicebot/metasbat_files/configs_no_valid.csv'
 # configurations_file = '/home/lukas/nicebot/metasbat_files/configs_all_models.csv'
 configurations = pd.read_csv(configurations_file)  # Load existing configs
+
+# Rename fields to make plots easier to understand
+assert all(configurations['data'].unique() == ['onlyRobotData', 'onlyAux', 'onlyEEGData', 'RobotEEGAux', 'RobotEEG'])
+configurations = configurations[configurations['data'] != 'RobotEEG']
+for old_data_type, new_data_type in zip(configurations['data'].unique(), ['Robot', 'Periphery', 'EEG',
+                                                                          'Combined']):
+    configurations.replace(old_data_type, new_data_type, inplace=True)
+
+assert all(
+    configurations['model_name'].unique() == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg'])
+for old_model_name, new_model_name in zip(configurations['model_name'].unique(), ['EEGNetv4', 'Deep4Net',
+                                                                                  'EEGResNet-29',
+                                                                                  'Linear', 'Linear SV',
+                                                                                  'Radial basis SV',
+                                                                                  'Random forest']):
+    configurations.replace(old_model_name, new_model_name, inplace=True)
 
 for i_config in configurations.index:
     result_folder = configurations.loc[i_config, 'result_folder']  # '/data/schirrmr/fiederer/nicebot/results'  #
@@ -95,7 +119,7 @@ y_shift_increment = 4
 data_values = configurations['data'].unique()
 bandpass_values = configurations['band_pass'].unique()
 electrodes_values = configurations['electrodes'].unique()
-subject_values = np.array(['moderate experience (S2)', 'no experience (S1)', 'substantial experience (S3)'])
+subject_values = np.array(['S2\n(mod. exp.)', 'S1\n(no exp.)', 'S3\n(subst. exp)'])
 model_order = [5, 6, 0, 1, 2, 3, 4]
 data_split = 'test'
 
@@ -148,8 +172,8 @@ for i_eeg_data in np.arange(3):
                                     (configurations['electrodes'] == electrodes_values[i_electrode])]
                 # df = df[df['band_pass'] == ]
                 assert (df['model_name'].size == 7)
-                assert (all(df['model_name'].values == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr',
-                                                        'rf_reg']))
+                assert (all(df['model_name'].values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear',
+                                                        'Linear SV', 'Radial basis SV', 'Random forest']))
                 df = df.iloc[model_order]
 
                 # tmp = np.full(7, np.nan)
@@ -205,7 +229,8 @@ plt.show()
 # data_split_values = ['train', 'test']
 data_split_values = ['test']
 model_values = configurations['model_name'].unique()
-assert (all(model_values == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']))
+assert (all(model_values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear', 'Linear SV', 'Radial basis SV',
+                             'Random forest']))
 
 # f.axes[0].set_xscale("log", nonposx='clip')
 # f.axes[0].set_xscale("log")
@@ -223,44 +248,118 @@ for data_split in data_split_values:
         x = x[~np.isnan(x)]
         y = y[~np.isnan(y)]
         if any(x):
-            metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+            metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
                                                        'data_split': data_split,
                                                        'metric_value': np.sqrt(x),
-                                                       'metric_name': 'rmse',
-                                                       'data': 'All data'}))
-            metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+                                                       'Metrics': 'Root mean square error',
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
+            metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
                                                        'data_split': data_split,
-                                                       'metric_value': 1 - np.abs(y),
-                                                       'metric_name': '1-abs(corr)',
-                                                       'data': 'All data'}))
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='model', metric_name_col='metric_name', metric_name='rmse',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+split_combi_plot(f, metric_df, x_col='Models', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Models', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Regressors')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('model_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
+
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+# add_significance_bars_below(metric_df, condition_col='model', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
+
+plot_diff_matrix(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name=['Root mean square error',
+                                                                                            "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Regressors',
+                 cmap='gray')
+plt.savefig('model_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
+
+# %% Best performing method without selection
+# data_split_values = ['train', 'test']
+data_split_values = ['test']
+model_values = configurations['model_name'].unique()
+assert (all(model_values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear', 'Linear SV', 'Radial basis SV',
+                             'Random forest']))
+
+# f.axes[0].set_xscale("log", nonposx='clip')
+# f.axes[0].set_xscale("log")
+metric_df = pd.DataFrame()
+for data_split in data_split_values:
+    # subplot_index += 1
+    for model_name in model_values:
+        df_mse = configurations[(configurations['model_name'] == model_name) &
+                                (configurations['band_pass'] == "'[None, None]'") &
+                                (configurations['electrodes'] == "'*'")]['mse_' + data_split]
+        df_corr = configurations[(configurations['model_name'] == model_name) &
+                                 (configurations['band_pass'] == "'[None, None]'") &
+                                 (configurations['electrodes'] == "'*'")]['corr_' + data_split]
+        # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
+        #             np.array([i if i is not None else np.nan for i in a])
+        #             for a, b in zip(df_mse, df_corr)])
+        x = np.array([i if i is not None else np.nan for i in df_mse])
+        y = np.array([i if i is not None else np.nan for i in df_corr])
+        x = x[~np.isnan(x)]
+        y = y[~np.isnan(y)]
+        if any(x):
+            metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
+                                                       'data_split': data_split,
+                                                       'metric_value': np.sqrt(x),
+                                                       'Metrics': 'Root mean square error',
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
+            metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
+                                                       'data_split': data_split,
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='model', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+split_combi_plot(f, metric_df, x_col='Models', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Models', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Regressors')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('model_no_selection_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
 
-plot_performance_matrix(metric_df, condition_col='model', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                      '1-abs(corr)'],
-                        metric_value_col='metric_value',
-                        title=None,
-                        cmap=plt.cm.Blues_r)
-plt.show()
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+# add_significance_bars_below(metric_df, condition_col='model', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
+
+plot_diff_matrix(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name=['Root mean square error',
+                                                                                            "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Regressors',
+                 cmap='gray')
+plt.savefig('model_no_selection_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% Best performing method for each data type
 
 data_values = configurations['data'].unique()
 data_split_values = ['test']
 model_values = configurations['model_name'].unique()
-assert (all(model_values == ['eegnet', 'deep4', 'resnet', 'lin_reg', 'lin_svr', 'rbf_svr', 'rf_reg']))
+assert (all(model_values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear', 'Linear SV', 'Radial basis SV',
+                             'Random forest']))
 
 for data in data_values:
     df = configurations[configurations['data'] == data]
@@ -278,37 +377,46 @@ for data in data_values:
             x = x[~np.isnan(x)]
             y = y[~np.isnan(y)]
             if any(x):
-                metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+                metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
                                                            'data_split': data_split,
                                                            'metric_value': np.sqrt(x),
-                                                           'metric_name': 'rmse',
+                                                           'Metrics': 'Root mean square error',
                                                            'data': data}))
-                metric_df = metric_df.append(pd.DataFrame({'model': model_name,
+                metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
                                                            'data_split': data_split,
-                                                           'metric_value': 1 - np.abs(y),
-                                                           'metric_name': '1-abs(corr)',
+                                                           'metric_value': y,
+                                                           'Metrics': "Pearson's rho",
                                                            'data': data}))
 
     f = plt.figure(figsize=[15, 10])
-    split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-    add_significance_bars(metric_df, condition_col='model', metric_name_col='metric_name', metric_name='rmse',
-                          metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-    plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-    plt.show()
+    split_combi_plot(f, metric_df, x_col='Models', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+    add_significance_bars_above(metric_df, condition_col='Models', metric_name_col='Metrics',
+                                metric_name='Root mean square error',
+                                metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+    add_significance_bars_below(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name="Pearson's "
+                                                                                                          "rho",
+                                metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+    plt.title(data)
+    handles, labels = f.axes[0].get_legend_handles_labels()
+    f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+    plt.savefig('model_' + data.replace(' ', '_') + '_violins.svg', bbox_inches='tight', dpi=300)
+    plt.close()
 
-    f = plt.figure(figsize=[15, 10])
-    split_combi_plot(f, metric_df, x_col='model', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-    add_significance_bars(metric_df, condition_col='model', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                          metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-    plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-    plt.show()
+    # f = plt.figure(figsize=[15, 10])
+    # split_combi_plot(f, metric_df, x_col='Models', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+    # add_significance_bars_above(metric_df, condition_col='Models', metric_name_col='Metrics', metric_name="Pearson's rho",
+    #                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+    # plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+    # plt.show()
 
-    plot_performance_matrix(metric_df, condition_col='model', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                          '1-abs(corr)'],
-                            metric_value_col='metric_value',
-                            title=data,
-                            cmap=plt.cm.Blues_r)
-    plt.show()
+    plot_diff_matrix(metric_df, condition_col='Models', metric_name_col='Metrics',
+                     metric_name=['Root mean square error',
+                                  "Pearson's rho"],
+                     metric_value_col='metric_value',
+                     title=data,
+                     cmap='gray')
+    plt.savefig('model_' + data.replace(' ', '_') + '_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+    plt.close()
 
 # %% Best electrode set EEG only
 # data_split_values = ['train', 'test']
@@ -320,45 +428,55 @@ metric_df = pd.DataFrame()
 for electrode_set_name in electrode_sets:
     for data_split in data_split_values:
         df_mse = configurations[(configurations['electrodes'] == electrode_set_name)
-                                & (configurations['data'] == 'onlyEEGData')]['mse_' + data_split]
+                                & (configurations['data'] == 'EEG')]['mse_' + data_split]
         df_corr = configurations[(configurations['electrodes'] == electrode_set_name)
-                                 & (configurations['data'] == 'onlyEEGData')]['corr_' + data_split]
+                                 & (configurations['data'] == 'EEG')]['corr_' + data_split]
         x = np.array([i if i is not None else np.nan for i in df_mse])
         y = np.array([i if i is not None else np.nan for i in df_corr])
         x = x[~np.isnan(x)]
         y = y[~np.isnan(y)]
         if any(x):
-            metric_df = metric_df.append(pd.DataFrame({'electrodes': electrode_set_name[1:-1],
+            metric_df = metric_df.append(pd.DataFrame({'Electrode selection': electrode_set_name[1:-1],
                                                        'data_split': data_split,
                                                        'metric_value': np.sqrt(x),
-                                                       'metric_name': 'rmse',
-                                                       'data': 'onlyEEGData'}))
-            metric_df = metric_df.append(pd.DataFrame({'electrodes': electrode_set_name[1:-1],
+                                                       'Metrics': 'Root mean square error',
+                                                       'data': 'EEG'}))
+            metric_df = metric_df.append(pd.DataFrame({'Electrode selection': electrode_set_name[1:-1],
                                                        'data_split': data_split,
-                                                       'metric_value': 1 - np.abs(y),
-                                                       'metric_name': '1-abs(corr)',
-                                                       'data': 'onlyEEGData'}))
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'data': 'EEG'}))
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='electrodes', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='electrodes', metric_name_col='metric_name', metric_name='rmse',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+split_combi_plot(f, metric_df, x_col='Electrode selection', y_col='metric_value', hue_col='Metrics',
+                 palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Electrode selection', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Electrode selection', metric_name_col='Metrics',
+                            metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Electrodes (EEG data)')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('electrode_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
 
-f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='electrodes', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='electrodes', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='Electrode selection', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+# add_significance_bars_above(metric_df, condition_col='Electrode selection', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
 
-plot_performance_matrix(metric_df, condition_col='electrodes', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                           '1-abs(corr)'],
-                        metric_value_col='metric_value',
-                        title=None,
-                        cmap=plt.cm.Blues_r)
-plt.show()
+plot_diff_matrix(metric_df, condition_col='Electrode selection', metric_name_col='Metrics',
+                 metric_name=['Root mean square error',
+                              "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Electrode selections (EEG data)',
+                 cmap='gray')
+plt.savefig('electrode_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% Best data combination
 # data_split_values = ['train', 'test']
@@ -380,33 +498,41 @@ for data_split in data_split_values:
         if any(x):
             metric_df = metric_df.append(pd.DataFrame({'data_split': data_split,
                                                        'metric_value': np.sqrt(x),
-                                                       'metric_name': 'rmse',
-                                                       'data': data}))
+                                                       'Metrics': 'Root mean square error',
+                                                       'Data': data}))
             metric_df = metric_df.append(pd.DataFrame({'data_split': data_split,
-                                                       'metric_value': 1 - np.abs(y),
-                                                       'metric_name': '1-abs(corr)',
-                                                       'data': data}))
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'Data': data}))
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='data', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='data', metric_name_col='metric_name', metric_name='rmse',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+split_combi_plot(f, metric_df, x_col='Data', y_col='metric_value', hue_col='Metrics', data_type_col='Data',
+                 palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Data', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Data types')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('data_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
 
-f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='data', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='data', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='Data', y_col='metric_value', hue_col='Metrics', data_type_col='Data', palette='colorblind')
+# add_significance_bars_above(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
 
-plot_performance_matrix(metric_df, condition_col='data', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                     '1-abs(corr)'],
-                        metric_value_col='metric_value',
-                        title=None,
-                        cmap=plt.cm.Blues_r)
-plt.show()
+plot_diff_matrix(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name=['Root mean square error',
+                                                                                          "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Data types',
+                 cmap='gray')
+plt.savefig('data_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% Best frequency band EEG only
 # data_split_values = ['train', 'test']
@@ -417,49 +543,60 @@ metric_df = pd.DataFrame()
 for bandpass in bandpass_sets:
     for data_split in data_split_values:
         df_mse = configurations[(configurations['band_pass'] == bandpass)
-                                & (configurations['data'] == 'onlyEEGData')]['mse_' + data_split]
+                                & (configurations['data'] == 'EEG')]['mse_' + data_split]
         df_corr = configurations[(configurations['band_pass'] == bandpass)
-                                 & (configurations['data'] == 'onlyEEGData')]['corr_' + data_split]
+                                 & (configurations['data'] == 'EEG')]['corr_' + data_split]
         x = np.array([i if i is not None else np.nan for i in df_mse])
         y = np.array([i if i is not None else np.nan for i in df_corr])
         x = x[~np.isnan(x)]
         y = y[~np.isnan(y)]
         if any(x):
-            metric_df = metric_df.append(pd.DataFrame({'band_pass': bandpass[1:-1],
+            metric_df = metric_df.append(pd.DataFrame({'Band-pass frequencies': bandpass[1:-1],
                                                        'data_split': data_split,
                                                        'metric_value': np.sqrt(x),
-                                                       'metric_name': 'rmse',
-                                                       'data': 'onlyEEGData'}))
-            metric_df = metric_df.append(pd.DataFrame({'band_pass': bandpass[1:-1],
+                                                       'Metrics': 'Root mean square error',
+                                                       'data': 'EEG'}))
+            metric_df = metric_df.append(pd.DataFrame({'Band-pass frequencies': bandpass[1:-1],
                                                        'data_split': data_split,
-                                                       'metric_value': 1 - np.abs(y),
-                                                       'metric_name': '1-abs(corr)',
-                                                       'data': 'onlyEEGData'}))
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'data': 'EEG'}))
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='band_pass', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='band_pass', metric_name_col='metric_name', metric_name='rmse',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+split_combi_plot(f, metric_df, x_col='Band-pass frequencies', y_col='metric_value', hue_col='Metrics',
+                 palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Band-pass frequencies', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Band-pass frequencies', metric_name_col='Metrics',
+                            metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Frequency bands (EEG data)')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('frequency_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
 
-f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='band_pass', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='band_pass', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='Band-pass frequencies', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+# add_significance_bars_above(metric_df, condition_col='Band-pass frequencies', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
 
-plot_performance_matrix(metric_df, condition_col='band_pass', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                          '1-abs(corr)'],
-                        metric_value_col='metric_value',
-                        title=None,
-                        cmap=plt.cm.Blues_r)
-plt.show()
+plot_diff_matrix(metric_df, condition_col='Band-pass frequencies', metric_name_col='Metrics',
+                 metric_name=['Root mean square error',
+                              "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Frequency bands (EEG data)',
+                 cmap='gray')
+plt.savefig('frequency_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% Overall best subject
 # data_split_values = ['train', 'test']
 data_split_values = ['test']
+subject_values = np.array(['S2\n(mod. exp.)', 'S1\n(no exp.)', 'S3\n(subst. exp)'])
 
 metric_df = pd.DataFrame()
 for data_split in data_split_values:
@@ -471,37 +608,335 @@ for data_split in data_split_values:
         x = x[~np.isnan(x)]
         y = y[~np.isnan(y)]
         if any(x):
-            metric_df = metric_df.append(pd.DataFrame({'subject': subject_values[i_subject],
+            metric_df = metric_df.append(pd.DataFrame({'Subjects': subject_values[i_subject],
                                                        'data_split': data_split,
                                                        'metric_value': np.sqrt(x),
-                                                       'metric_name': 'rmse',
-                                                       'data': 'All data'}))
-            metric_df = metric_df.append(pd.DataFrame({'subject': subject_values[i_subject],
+                                                       'Metrics': 'Root mean square error',
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
+            metric_df = metric_df.append(pd.DataFrame({'Subjects': subject_values[i_subject],
                                                        'data_split': data_split,
-                                                       'metric_value': 1 - np.abs(y),
-                                                       'metric_name': '1-abs(corr)',
-                                                       'data': 'All data'}))
+                                                       'metric_value': y,
+                                                       'Metrics': "Pearson's rho",
+                                                       'data': 'Robot, Aux, EEG, Robot+Aux+EEG'}))
+
+metric_df.sort_values(by='Subjects', ascending=True, inplace=True)
+f = plt.figure(figsize=[15, 10])
+split_combi_plot(f, metric_df, x_col='Subjects', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+add_significance_bars_above(metric_df, condition_col='Subjects', metric_name_col='Metrics',
+                            metric_name='Root mean square error',
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+add_significance_bars_below(metric_df, condition_col='Subjects', metric_name_col='Metrics', metric_name="Pearson's rho",
+                            metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+plt.title('Subjects')
+handles, labels = f.axes[0].get_legend_handles_labels()
+f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+plt.savefig('subject_violins.svg', bbox_inches='tight', dpi=300)
+plt.close()
+
+# f = plt.figure(figsize=[15, 10])
+# split_combi_plot(f, metric_df, x_col='Subjects', y_col='metric_value', hue_col='Metrics', palette='colorblind')
+# add_significance_bars_above(metric_df, condition_col='Subjects', metric_name_col='Metrics', metric_name="Pearson's rho",
+#                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+# plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
+# plt.show()
 
 f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='subject', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='subject', metric_name_col='metric_name', metric_name='rmse',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+plot_diff_matrix(metric_df, condition_col='Subjects', metric_name_col='Metrics', metric_name=['Root mean square error',
+                                                                                              "Pearson's rho"],
+                 metric_value_col='metric_value',
+                 title='Subjects',
+                 cmap='gray')
+plt.savefig('subject_diff_matrix.pdf', bbox_inches='tight', dpi=300)
+plt.close()
 
-f = plt.figure(figsize=[15, 10])
-split_combi_plot(f, metric_df, x_col='subject', y_col='metric_value', hue_col='metric_name', palette='colorblind')
-add_significance_bars(metric_df, condition_col='subject', metric_name_col='metric_name', metric_name='1-abs(corr)',
-                      metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
-plt.savefig('test.pdf', bbox_inches='tight', dpi=300)
-plt.show()
+# %% Combine SVGs
 
-plot_performance_matrix(metric_df, condition_col='subject', metric_name_col='metric_name', metric_name=['rmse',
-                                                                                                        '1-abs(corr)'],
-                        metric_value_col='metric_value',
-                        title=None,
-                        cmap=plt.cm.Blues_r)
-plt.show()
+doc_pm = ss.Document()
+
+layout0 = ss.VBoxLayout()
+layout0.addSVG('model_diff_matrix.svg', alignment=ss.AlignHCenter)
+
+layout1 = ss.HBoxLayout()
+layout1.addSVG('data_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout1.addSVG('electrode_diff_matrix.svg', alignment=ss.AlignVCenter)
+
+layout2 = ss.HBoxLayout()
+layout2.addSVG('subject_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout2.addSVG('frequency_diff_matrix.svg', alignment=ss.AlignVCenter | ss.AlignRight)
+
+layout0.addLayout(layout1)
+layout0.addLayout(layout2)
+
+doc_pm.setLayout(layout0)
+doc_pm.save('diff_matrix_plot.svg')
+
+doc_v = ss.Document()
+layout0 = ss.VBoxLayout()
+layout0.addSVG('model_violins.svg', alignment=ss.AlignHCenter)
+layout1 = ss.HBoxLayout()
+layout1.addSVG('data_violins.svg', alignment=ss.AlignVCenter)
+layout1.addSVG('electrode_violins.svg', alignment=ss.AlignVCenter)
+layout2 = ss.HBoxLayout()
+layout2.addSVG('subject_violins.svg', alignment=ss.AlignVCenter)
+layout2.addSVG('frequency_violins.svg', alignment=ss.AlignVCenter)
+layout0.addLayout(layout1)
+layout0.addLayout(layout2)
+doc_v.setLayout(layout0)
+doc_v.save('violins_plot.svg')
+
+doc_v_d = ss.Document()
+layout0 = ss.VBoxLayout()
+layout1 = ss.HBoxLayout()
+layout1.addSVG('model_Robot_violins.svg', alignment=ss.AlignVCenter)
+layout1.addSVG('model_Aux_violins.svg', alignment=ss.AlignVCenter)
+layout2 = ss.HBoxLayout()
+layout2.addSVG('model_EEG_violins.svg', alignment=ss.AlignVCenter)
+layout2.addSVG('model_Robot+Aux+EEG_violins.svg', alignment=ss.AlignVCenter)
+layout0.addLayout(layout1)
+layout0.addLayout(layout2)
+doc_v_d.setLayout(layout0)
+doc_v_d.save('violins_models4data_plot.svg')
+
+doc_pm_d = ss.Document()
+layout0 = ss.VBoxLayout()
+layout1 = ss.HBoxLayout()
+layout1.addSVG('model_Robot_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout1.addSVG('model_Aux_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout2 = ss.HBoxLayout()
+layout2.addSVG('model_EEG_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout2.addSVG('model_Robot+Aux+EEG_diff_matrix.svg', alignment=ss.AlignVCenter)
+layout0.addLayout(layout1)
+layout0.addLayout(layout2)
+doc_v_d.setLayout(layout0)
+doc_v_d.save('diff_matrix_models4data_plot.svg')
+
+# %% Plot per model data type overview
+data_values = configurations['data'].unique()
+data_split_values = ['test']
+model_values = configurations['model_name'].unique()
+assert (all(model_values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear', 'Linear SV', 'Radial basis SV',
+                             'Random forest']))
+
+for model_name in model_values:
+    df = configurations[configurations['model_name'] == model_name]
+
+    metric_df = pd.DataFrame()
+    for data_split in data_split_values:
+        for data in data_values:
+            df_mse = df[(df['data'] == data)]['mse_' + data_split]
+            df_corr = df[(df['data'] == data)]['corr_' + data_split]
+            # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
+            #             np.array([i if i is not None else np.nan for i in a])
+            #             for a, b in zip(df_mse, df_corr)])
+            x = np.array([i if i is not None else np.nan for i in df_mse])
+            y = np.array([i if i is not None else np.nan for i in df_corr])
+            x = x[~np.isnan(x)]
+            y = y[~np.isnan(y)]
+            if any(x):
+                metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
+                                                           'data_split': data_split,
+                                                           'metric_value': np.sqrt(x),
+                                                           'Metrics': 'Root mean square error',
+                                                           'Data': data}))
+                metric_df = metric_df.append(pd.DataFrame({'Models': model_name,
+                                                           'data_split': data_split,
+                                                           'metric_value': y,
+                                                           'Metrics': "Pearson's rho",
+                                                           'Data': data}))
+
+    plot_diff_matrix(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name=['Root mean square '
+                                                                                              'error',
+                                                                                              "Pearson's rho"],
+                     metric_value_col='metric_value',
+                     title=model_name,
+                     cmap='gray')
+    plt.savefig(model_name.replace(' ', '_') + '_diff_matrix.svg', bbox_inches='tight', dpi=300)
+    plt.close()
+
+# %% Randperm baseline
+n_seconds_test_set = configurations['n_seconds_test_set'].unique()
+assert n_seconds_test_set.size == 1
+sampling_rate = configurations['sampling_rate'].unique()
+assert sampling_rate.size == 1
+seed = 0
+metric_functions = [stats.pearsonr, mean_squared_error, r2_score]
+n_permutes = int(1e6)
+score_files = glob.glob("./data/BBCIformat/*_score.mat")
+randperm_scores = []  # np.nan * np.ndarray(len(score_files))
+to_test = []
+to_permute = []
+for idx, score_filename in enumerate(score_files):
+    score_tmp = sp.io.loadmat(score_filename)
+    score = score_tmp['score_resample']
+    to_permute.append(score[0, :-1])
+    cut_ind_test = int(np.size(to_permute[idx]) - n_seconds_test_set[0] * sampling_rate[0])
+    to_test.append(to_permute[idx][cut_ind_test:])
+    to_permute[idx] = to_permute[idx][:cut_ind_test]
+    # randperm_scores.append(random_permutation(to_permute,
+    #                                           to_test,
+    #                                           n_permutes=n_permutes,
+    #                                           metric_functions=metric_functions,
+    #                                           seed=seed))
+
+np.random.seed(seed=seed)
+permutation_metrics = np.nan * np.zeros((len(to_permute), n_permutes, len(metric_functions)))
+next_power = 0
+for i_permute in range(n_permutes):
+    for i_to_permute in range(len(to_permute)):
+        permuted = np.random.permutation(to_permute[i_to_permute])
+        to_test_len = len(to_test[i_to_permute])
+        for i_metric in range(len(metric_functions)):
+            permutation_metrics[i_to_permute, i_permute, i_metric] = \
+                np.atleast_1d(metric_functions[i_metric](to_test[i_to_permute],
+                                                         permuted[:to_test_len]))[0]
+
+    if np.mod(i_permute + 1, 10 ** next_power) == 0:
+        joblib.dump(permutation_metrics, 'permutation_metrics.pkl.z')
+        print("Stats at {:g} iterations:".format(10 ** next_power))
+        next_power += 1
+        print('min')
+        print(np.nanmin(permutation_metrics, axis=1))
+        print("max")
+        print(np.nanmax(permutation_metrics, axis=1))
+        print("mean")
+        print(np.nanmean(permutation_metrics, axis=1))
+        print("median")
+        print(np.nanmedian(permutation_metrics, axis=1))
+
+# %% Plot per model data type without selections overview
+data_values = configurations['data'].unique()
+data_split_values = ['test']
+model_values = configurations['model_name'].unique()
+reorder_modalities = [0, 2, 1, 3]
+assert (all(model_values == ['EEGNetv4', 'Deep4Net', 'EEGResNet-29', 'Linear', 'Linear SV', 'Radial basis SV',
+                             'Random forest']))
+metrics = ["Pearson's rho", 'Root mean square error']  # The order is very important here as it is hardcoded in the
+# permutation metric matrix
+assert (metric_functions[0] == stats.pearsonr) & (metric_functions[1] == mean_squared_error)
+permutation_metrics = joblib.load("permutation_metrics.pkl.z")
+p_values = np.nan * np.ndarray([len(subject_values), len(data_values), len(model_values), len(metrics)])
+q_values = np.nan * np.ndarray(p_values.shape)
+
+for idz, model_name in enumerate(model_values):
+    df = configurations[(configurations['model_name'] == model_name) &
+                        (configurations['band_pass'] == "'[None, None]'") &
+                        (configurations['electrodes'] == "'*'")]
+
+    metric_df = pd.DataFrame()
+    for data_split in data_split_values:
+        for data in data_values:
+            for i_subject in [1, 0, 2]:
+                df_mse = df[(df['data'] == data)]['mse_' + data_split]
+                df_corr = df[(df['data'] == data)]['corr_' + data_split]
+                # x = np.abs([np.array([i if i is not None else np.nan for i in b]) /
+                #             np.array([i if i is not None else np.nan for i in a])
+                #             for a, b in zip(df_mse, df_corr)])
+                x = np.array([i[i_subject] if i is not None else np.nan for i in df_mse])
+                y = np.array([i[i_subject] if i is not None else np.nan for i in df_corr])
+                x = x[~np.isnan(x)]
+                y = y[~np.isnan(y)]
+                if any(x):
+                    metric_df = metric_df.append(pd.DataFrame({'Subjects': subject_values[i_subject],
+                                                               'Models': model_name,
+                                                               'data_split': data_split,
+                                                               'metric_value': np.sqrt(x),
+                                                               'Metrics': 'Root mean square error',
+                                                               'Data': data}))
+                    metric_df = metric_df.append(pd.DataFrame({'Subjects': subject_values[i_subject],
+                                                               'Models': model_name,
+                                                               'data_split': data_split,
+                                                               'metric_value': y,
+                                                               'Metrics': "Pearson's rho",
+                                                               'Data': data}))
+
+    # f = plt.figure(figsize=[15, 10])
+    # split_combi_plot(f, metric_df, x_col='Data', y_col='metric_value', hue_col='Metrics', palette='colorblind',
+    #                  data_type_col='Data')
+    # add_significance_bars_above(metric_df, condition_col='Data', metric_name_col='Metrics',
+    #                             metric_name='Root mean square error',
+    #                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[0])
+    # add_significance_bars_below(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name="Pearson's "
+    #                                                                                                       "rho",
+    #                             metric_value_col='metric_value', barc=sns.color_palette('colorblind')[1])
+    # plt.title(model_name)
+    # handles, labels = f.axes[0].get_legend_handles_labels()
+    # f.axes[0].legend(handles=handles[0:2], labels=labels[0:2], title='Metrics', loc=2)
+    # plt.savefig(model_name.replace(' ', '_') + '_no_selection_violins.svg', bbox_inches='tight', dpi=300)
+    # plt.close()
+    #
+    # plot_diff_matrix(metric_df, condition_col='Data', metric_name_col='Metrics', metric_name=['Root mean square '
+    #                                                                                               'error',
+    #                                                                                                       "Pearson's rho"],
+    #                  metric_value_col='metric_value',
+    #                  title=model_name,
+    #                  cmap='gray',
+    #                  averaging_func=np.mean)
+    # plt.savefig(model_name.replace(' ', '_') + '_no_selection_diff_matrix.svg', bbox_inches='tight', dpi=300)
+    # plt.close()
+
+    for index, metric_name in enumerate(metrics):
+        clist = [[1, 1, 1], sns.color_palette('colorblind')[index]]
+        if index == 1:
+            cmap = LinearSegmentedColormap.from_list('white2colorblind', clist, N=256)
+        else:
+            cmap = LinearSegmentedColormap.from_list('white2colorblind', clist[::-1], N=256)
+        # plot_performance_matrix(metric_df,
+        #                         x_col='Subjects',
+        #                         y_col='Data',
+        #                         metric_name_col='Metrics',
+        #                         metric_name=metric_name,
+        #                         metric_value_col='metric_value',
+        #                         title=model_name,
+        #                         cmap=cmap,
+        #                         averaging_func=np.mean)
+        # plt.savefig(
+        #     model_name.replace(' ', '_') + '_no_selection_performance_matrix_' + metric_name.replace(' ', '_') + '.svg',
+        #     bbox_inches='tight', dpi = 300)
+        # plt.close()
+        performance_matrix, x_labels, y_labels = compute_performance_matrix(metric_df,
+                                                                            x_col='Subjects',
+                                                                            y_col='Data',
+                                                                            metric_name_col='Metrics',
+                                                                            metric_name=metric_name,
+                                                                            metric_value_col='metric_value',
+                                                                            averaging_func=np.mean)
+        print(model_name + ' ' + metric_name)
+        print(y_labels[reorder_modalities])
+        print(" \\\\\n".join(
+            [" & ".join(map('{0:.3f}'.format, line)) for line in performance_matrix[:, reorder_modalities]]))
+        for idx, metric_value_per_subject in enumerate(performance_matrix[:, reorder_modalities]):
+            performed_randperms = np.sum(~np.isnan(permutation_metrics[idx, :, 0]))
+            if performed_randperms != permutation_metrics.shape[1]:
+                print("Warning, p-values based on {:g} permutations instead of {:g}!".format(performed_randperms,
+                                                                                             permutation_metrics.shape[
+                                                                                                 1]))
+            for idy, metric_value_per_data in enumerate(metric_value_per_subject):
+                if metric_name == 'Root mean square error':
+                    metric_index = 1
+                    p_values[idx, idy, idz, metric_index] = (np.sum(permutation_metrics[idx, :, metric_index] <=
+                                                                    metric_value_per_data) + 1) / \
+                                                            (performed_randperms + 1)
+                elif metric_name == "Pearson's rho":
+                    metric_index = 0
+                    p_values[idx, idy, idz, metric_index] = (np.sum(permutation_metrics[idx, :, metric_index] >=
+                                                                    metric_value_per_data) + 1) / \
+                                                            (performed_randperms + 1)
+                else:
+                    assert 0 == 1, "Unknown metric!"
+        print("p-values")
+        print(" \\\\\n".join(
+            [" & ".join(map('{0:.3f}'.format, line)) for line in p_values[:, :, idz, metric_index]]))
+
+for i_subject in range(len(subject_values)):
+    for i_metric in range(len(metrics)):
+        q_values[i_subject, :, :, i_metric] = fdr_corrected_pvals(p_values[i_subject, :, :, i_metric])
+
+for idz, model_name in enumerate(model_values):
+    for index, metric_name in enumerate(metrics):
+        print(model_name + ' ' + metric_name + ' q-values')
+        print(y_labels[reorder_modalities])
+        print(
+            " \\\\\n".join([" & ".join(map('{0:.3f}'.format, line)) for line in q_values[:, :, idz, index]]))
 
 
 ################################
@@ -509,7 +944,7 @@ plt.show()
 ################################
 # %% Plot comparison matrix
 mat_padding = ((10, 10), (10, 10))
-subject_values = np.array(['moderate experience (S2)', 'no experience (S1)', 'substantial experience (S3)'])
+subject_values = np.array(['S2 moderate experience', 'S1 no experience', 'S3 substantial experience'])
 data_split_values = ['train', 'valid', 'test']
 
 f = plt.figure(figsize=[15, 15])
@@ -581,7 +1016,7 @@ for i_subject in range(len(subject_values)):
 
         ax.bar()
         ax.set_title(data_split + ' set, ' + subject_values[i_subject])
-plt.show()
+        plt.show()
 
 # %% Circle plot in one axes
 
@@ -598,8 +1033,8 @@ for i_no_eeg_data in np.arange(2):
                     c=('b', 'g', 'r', 'c', 'm', 'y', 'k'))
         x_shift += 6 * 21
         # subplot_index += 1
-    x_shift = 18
-    y_shift -= 2
+        x_shift = 18
+        y_shift -= 2
 
 x_shift = 0
 y_shift = 10 * 4
@@ -611,9 +1046,9 @@ for i_eeg_data in np.arange(3):
                 plt.scatter(x_positions + x_shift, y_positions + y_shift, s=np.random.rand(7) * 10,
                             c=('b', 'g', 'r', 'c', 'm', 'y', 'k'))
                 y_shift -= 2
-            x_shift += 50
-            y_shift = 10 * 4
-        # subplot_index += 1
+                x_shift += 50
+                y_shift = 10 * 4
+                # subplot_index += 1
 
 plt.show()
 
