@@ -1,8 +1,9 @@
+import itertools as it
+
 import numpy as np
 import pandas as pd
 
-from metasbat_files.assemble_results import subject_values
-from utils.statistics import significance_test
+from utils.statistics import significance_test, fdr_corrected_pvals
 
 
 def initialize_empty_columns_at_index(dataframe, row_index):
@@ -123,7 +124,7 @@ def dataframe_significance_test(dataframe, condition_col, condition_name_a, cond
     return significance_test(a, b, alpha=0.5, alternative='two-sided', use_continuity=True)
 
 
-def single_value_row_configurations(configurations):
+def single_value_row_configurations(configurations, subject_values):
     # Reformat configuration dataframe to have one row per metric value
     single_value_configurations = pd.DataFrame()
     for i_config in range(len(configurations)):
@@ -174,3 +175,84 @@ def remove_columns_with_same_value(df, exclude=('train',)):
     excluded_cols = np.array([c in exclude for c in df.columns])
     df = df.iloc[:, (cols_multiple_vals | excluded_cols)]
     return df
+
+
+def print_performance_matrix(dataframe,
+                             x_col,
+                             y_col,
+                             metric_name_col,
+                             metric_name,
+                             metric_value_col,
+                             averaging_func=np.median,
+                             transformation_func=lambda x: x,
+                             fmt=':3f'):
+    performance_matrix = compute_performance_matrix(dataframe,
+                                                    x_col,
+                                                    y_col,
+                                                    metric_name_col,
+                                                    metric_name,
+                                                    metric_value_col,
+                                                    averaging_func=averaging_func,
+                                                    transformation_func=transformation_func)[0]
+    # format(performance_matrix, fmt)
+    # latex_tabular = " \\\\\n".join([" & ".join(map(str, line)) for line in performance_matrix])
+    print(" \\\\\n".join([" & ".join(map('{0:.3f}'.format, line)) for line in performance_matrix]))
+    # print(latex_tabular.)
+
+
+def compute_performance_matrix(dataframe,
+                               x_col,
+                               y_col,
+                               metric_name_col,
+                               metric_name,
+                               metric_value_col,
+                               averaging_func=np.median,
+                               transformation_func=lambda x: x):
+    x_values, x_indices = np.unique(dataframe[x_col], return_index=True)
+    x_values = x_values[np.argsort(x_indices)]
+    x_indices = range(len(x_values))
+    y_values, y_indices = np.unique(dataframe[y_col], return_index=True)
+    y_values = y_values[np.argsort(y_indices)]
+    y_indices = range(len(y_values))
+    performance_matrix = np.ndarray((len(x_indices), len(y_indices)))
+    for x, y in it.product(range(len(x_indices)), range(len(y_indices))):
+        a = transformation_func(dataframe[(dataframe[x_col] == x_values[x]) &
+                                          (dataframe[y_col] == y_values[y]) &
+                                          (dataframe[metric_name_col] == metric_name)][metric_value_col].values)
+        if np.size(a) > 1:
+            performance_matrix[x, y] = averaging_func(a)
+        else:
+            performance_matrix[x, y] = a
+    return performance_matrix, x_values, y_values
+
+
+def compute_diff_matrix(dataframe, condition_col, metric_name_col='metric_name', metric_name='rmse',
+                        metric_value_col='metric_value', averaging_func=np.median):
+    condition_values, condition_indices = np.unique(dataframe[condition_col], return_index=True)
+    condition_values = condition_values[np.argsort(condition_indices)]
+    condition_indices = range(len(condition_values))
+    diff_matrix = np.ndarray((len(condition_indices), len(condition_indices)))
+    significance_matrix = np.ndarray(diff_matrix.shape)
+    for x, y in it.product(range(len(condition_indices)), range(len(condition_indices))):
+        a = get_dataframe_values_matching_two_criteria_in_two_columns(
+            dataframe,
+            condition_col,
+            condition_values[x],
+            metric_name_col,
+            metric_name,
+            metric_value_col)
+        b = get_dataframe_values_matching_two_criteria_in_two_columns(
+            dataframe,
+            condition_col,
+            condition_values[y],
+            metric_name_col,
+            metric_name,
+            metric_value_col)
+        if np.size(a) >= 10:
+            diff_matrix[x, y] = averaging_func(a) - averaging_func(b)
+        else:
+            diff_matrix[x, y] = averaging_func(a - b)
+        significance_matrix[x, y] = significance_test(a, b, alpha=0.5, alternative='two-sided', use_continuity=True)
+    tril_indices = np.tril_indices_from(significance_matrix, k=-1)
+    significance_matrix[tril_indices] = fdr_corrected_pvals(significance_matrix[tril_indices])
+    return diff_matrix, significance_matrix, condition_values
