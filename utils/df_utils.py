@@ -256,3 +256,12 @@ def compute_diff_matrix(dataframe, condition_col, metric_name_col='metric_name',
     tril_indices = np.tril_indices_from(significance_matrix, k=-1)
     significance_matrix[tril_indices] = fdr_corrected_pvals(significance_matrix[tril_indices])
     return diff_matrix, significance_matrix, condition_values
+
+
+def expand_row_with_multiple_values(df, column):
+    new_df = df
+    for row in df.index:
+        for column in df.iloc[row]:
+            tmp = np.size(column)
+            if tmp > 1:
+                new_df
