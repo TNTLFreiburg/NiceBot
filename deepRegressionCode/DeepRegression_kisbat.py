@@ -25,9 +25,11 @@ import joblib  # to save models
 from torch_ext.schedulers import ScheduledOptimizer, CosineAnnealing, CutCosineAnnealing
 from torch_ext.optimizers import AdamW
 
+from braindecode.experiments.monitors import compute_preds_per_trial_from_crops
 from braindecode.datasets.bbci import BBCIDataset
 from braindecode.datautil.iterators import CropsFromTrialsIterator
 from braindecode.models.deep4 import Deep4Net
+from braindecode.models.shallow_fbcsp import ShallowFBCSPNet
 from braindecode.models.eegnet import EEGNetv4
 from braindecode.torch_ext.util import set_random_seeds
 from braindecode.models.util import to_dense_prediction_model
@@ -95,8 +97,7 @@ def run_experiment(
         sampling_rate=256,
         n_seconds_test_set=180,
         n_seconds_valid_set=180,
-        data='onlyRobotData'
-):
+        data='onlyRobotData'):
     # Set if you want to use GPU
     # You can also use torch.cuda.is_available() to determine if cuda is available on your machine.
     cuda = cuda
@@ -122,6 +123,7 @@ def run_experiment(
     # which model
     model_name = model_name  # deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg
     deep4 = False
+    shallow = False
     res_net = False
     eeg_net_v4 = False
     lin_reg = False
@@ -130,6 +132,8 @@ def run_experiment(
     rf_reg = False
     if model_name == 'deep4':
         deep4 = True
+    if model_name == 'shallownet':
+        shallow = True
     elif model_name == 'resnet':
         res_net = True
     elif model_name == 'eegnet':
@@ -143,7 +147,8 @@ def run_experiment(
     elif model_name == 'rf_reg':
         rf_reg = True
     else:
-        print('Wrong model_name {}. model_name can be deep4, resnet, eegnet, lin_reg, lin_svr, rbf_svr, rf_reg.'.format(
+        print('Wrong model_name {}. model_name can be deep4, shallownet, resnet, eegnet, lin_reg, lin_svr, rbf_svr, '
+              'rf_reg.'.format(
             model_name))
         return
 
@@ -229,6 +234,12 @@ def run_experiment(
                 return
             # deep4 stride 2: 1825
             # deep4 stride 3: 3661
+        elif shallow:
+            # WARNING!!! These values have not been tested and will not lead to a predictor time length of 1000 ms!!
+            # TODO: find correct values
+            pool_time_stride = 15
+            time_window_duration = 1335
+            save_addon_text = save_addon_text + '_ShallowNet'
         elif res_net:
             time_window_duration = 1005  # ms
             save_addon_text = save_addon_text + '_ResNet'
@@ -471,7 +482,7 @@ def run_experiment(
                     plt.ylim(-1, 1)
                     plt.xlim(0, int(np.round(train_set_pred.shape[0] / sampling_rate)))
                     # plt.show()
-                    plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.png',
+                    plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.pdf',
                                 bbox_inches='tight', dpi=300)
                     plt.close('all')
 
@@ -494,7 +505,7 @@ def run_experiment(
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(valid_set_pred.shape[0] / sampling_rate)))
                         # plt.show()
-                        plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
+                        plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.pdf',
                                     bbox_inches='tight', dpi=300)
                         plt.close('all')
 
@@ -517,14 +528,14 @@ def run_experiment(
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(test_set_pred.shape[0] / sampling_rate)))
                         # plt.show()
-                        plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png',
+                        plt.savefig(model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.pdf',
                                     bbox_inches='tight', dpi=300)
                         plt.close('all')
                     # ADD  DISTANCE AND SPEED TO BBCI FILE!!!
 
             elif model_name in ['deep4', 'resnet', 'eegnet']:
                 set_random_seeds(seed=20170629, cuda=cuda)
-                torch.cuda.set_device(gpu_index)
+                th.cuda.set_device(gpu_index)
 
                 # This will determine how many crops are processed in parallel
                 input_time_length = int(time_window_duration / 1000 * sampling_rate)  # train_set[i_subject].X.shape[1]
@@ -535,6 +546,11 @@ def run_experiment(
                     model = Deep4Net(in_chans=in_chans, n_classes=1, input_time_length=input_time_length,
                                      pool_time_stride=pool_time_stride,
                                      final_conv_length=2, stride_before_pool=True).create_network()
+                if shallow:
+                    # final_conv_length determines the size of the receptive field of the ConvNet
+                    model = ShallowFBCSPNet(in_chans=in_chans, n_classes=1, input_time_length=input_time_length,
+                                            pool_time_stride=pool_time_stride,
+                                            final_conv_length=2).create_network()
                 elif res_net:
                     model_name = 'resnet-xavier-uniform'
                     init_name = model_name.lstrip('resnet-')
@@ -676,7 +692,7 @@ def run_experiment(
                 exp.epochs_df.loc[:, ['train_loss', 'valid_loss', 'test_loss']].plot(ax=axarr[0], title='loss function',
                                                                                      logy=True)
                 exp.epochs_df.loc[:, ['train_corr', 'valid_corr', 'test_corr']].plot(ax=axarr[1], title='correlation')
-                plt.savefig(exp.model_base_name + '_fig_lc.png', bbox_inches='tight')
+                plt.savefig(exp.model_base_name + '_fig_lc.pdf', bbox_inches='tight')
 
                 for i_eval_subject in range(len(subjects)):
 
@@ -715,7 +731,7 @@ def run_experiment(
                     plt.ylabel('subjective rating')
                     plt.ylim(-1, 1)
                     plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                    plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.png',
+                    plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_train.pdf',
                                 bbox_inches='tight', dpi=300)
                     plt.close('all')
 
@@ -758,7 +774,7 @@ def run_experiment(
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.png',
+                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_valid.pdf',
                                     bbox_inches='tight', dpi=300)
                         plt.close('all')
                     else:
@@ -805,7 +821,7 @@ def run_experiment(
                         plt.ylabel('subjective rating')
                         plt.ylim(-1, 1)
                         plt.xlim(0, int(np.round(preds_per_trial.shape[0] / sampling_rate)))
-                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.png',
+                        plt.savefig(exp.model_base_name + '_' + subjects[i_eval_subject] + '_fig_pred_test.pdf',
                                     bbox_inches='tight', dpi=300)
                         log.info("-----------------------------------------")
                         plt.close('all')
@@ -840,14 +856,14 @@ def run_experiment(
                     model_pert.eval();
                     pred_fn = lambda x: [layer_out.data.numpy() for
                                          layer_out in
-                                         model_pert.forward(torch.autograd.Variable(torch.from_numpy(x)).float())]
+                                         model_pert.forward(th.autograd.Variable(th.from_numpy(x)).float())]
 
                     # Gotta change pred_fn a bit for cuda case
                     if cuda:
                         model_pert.cuda()
                         pred_fn = lambda x: [layer_out.data.cpu().numpy() for
                                              layer_out in model_pert.forward(
-                                torch.autograd.Variable(torch.from_numpy(x)).float().cuda())]
+                                th.autograd.Variable(th.from_numpy(x)).float().cuda())]
 
                     perm_X = np.expand_dims(train_set[i_subject].X, 3)  # Input gotta have dimension BxCxTx1
 
