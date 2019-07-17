@@ -23,10 +23,10 @@ addpath('analysisCode')
 % path to kuka sunrise toolbox
 addpath(fullfile('reconstruction', 'Modi1987-KST-Kuka-Sunrise-Toolbox-7b72637', 'realTimeControl_iiwa_From_Vrep'));
 
-for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the last line of the file if you are running in cell mode
+% for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the last line of the file if you are running in cell mode
     % First, load data file of respective user, e.g.:
-    % user_experience = 'moderate'; % 'no', 'substantial' % Comment this line if you are running in loop mode
-    user_experience = user_experience{:};
+    user_experience = 'moderate'; % 'no', 'substantial' % Comment this line if you are running in loop mode
+%     user_experience = user_experience{:}; % Comment this and the last line of the file if you are running in cell mode
     load(fullfile('data', ['allFiles_' user_experience 'Exp.mat']));
     
     %then, run the respective sections within the script individually
@@ -200,7 +200,7 @@ for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the l
     
     hold on;
     
-    for iTime =  1:nStimulusData
+    for iTime =  1:1:nStimulusData
         plot3(handBasePosition(iTime,1), handBasePosition(iTime,2), handBasePosition(iTime,3),...
             '.', 'color', cMap(ceil((score(iTime)+1.001)*256),:))
         %     pause (0.00001)
@@ -210,6 +210,16 @@ for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the l
     scatter3(0,0,0, 5000, [0 0 0],'filled')
     alpha(0.5)
     % plot3(0.1,0.1,0.1, 'k>', 'MarkerSize',  40, 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', [0 0 0])
+    
+%    % ROIs centers
+%    pos_roi{1} = [1.032, -0.48, 0.689];%[0.79, -0.47, 0.72]; %_init
+%    pos_roi{2} = [1.429, -0.655, -0.307];%[1.40, -0.77, -0.38]; %_grasping
+%    pos_roi{3} = [0.099, -0.70, 0.509];%[-0.11, -0.77, 0.19]; %_overhead
+%    pos_roi{4} = [0.518, 0.038, -0.205];%[0.47, 0, -0.18]; %_correct_end
+%    pos_roi{5} = [0.297, -0.30, 0.44];%[0.53, -0.02, 0.14]; %_wrong_end
+%    tmp = reshape([pos_roi{:}], 3, size(pos_roi, 2));
+%    scatter3(tmp(1,:), tmp(2,:), tmp(3,:), 500, [0 0 0],'filled', 's') % 16000, [0 0 0],'filled', 's')
+%    alpha(0.5)
     
     xlabel('x');
     ylabel('y');
@@ -228,20 +238,20 @@ for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the l
     az = -80.8000; el =  5.2000; % view from diagonal behind user
     view(az,el);
     %
-    print(gcf,fullfile('figures',  [user_experience, '_view_diagonal_behind']),'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_diagonal_behind']),'-dpdf','-r300', '-painters')
     
     az = -180; el =  0;  % view from left side of user
     view(az,el);
-    print(gcf,fullfile('figures',  [user_experience, '_view_left']),'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_left']),'-dpdf','-r300', '-painters')
     
     az = -90; el =  0.0000;  % view from straight behind side of user
     view(az,el);
-    print(gcf,fullfile('figures',  [user_experience, '_view_straight_behind']),'-dpdf','-r1200')
+    print(gcf,fullfile('figures',  [user_experience, '_view_straight_behind']),'-dpdf','-r300', '-painters')
     
     az = -90; el =  90;  % topview
     view(az,el);
-    print(gcf,fullfile('figures',  [user_experience, '_view_top']),'-dpdf','-r1200')
-    clf
+    print(gcf,fullfile('figures',  [user_experience, '_view_top']),'-dpdf','-r300', '-painters')
+    close(gcf)
     %[az,el] = view % get current viewing angle
     
     %% Define Header
@@ -397,7 +407,7 @@ for user_experience = {'no', 'moderate', 'substantial'} % Comment this and the l
         write = 1;
         savePath = 'data\BBCIformat';
         saveName = [H.PatientSession '_' num2str(H.sf) 'Hz_CAR'];
-        [hdr, mrk, mnt, nfo, dat] = ERN_BBCI_import(H,M,D, overwrite, write, savePath, saveName);
+%         [hdr, mrk, mnt, nfo, dat] = ERN_BBCI_import(H,M,D, overwrite, write, savePath, saveName);
         
         % interpolate score from 16 Hz to 256 Hz. We do so manually by upssampling to avoid filter artifacts
         for iScore = 1:numel(score)
